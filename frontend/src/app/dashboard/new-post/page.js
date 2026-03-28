@@ -93,12 +93,16 @@ export default function NewPostPage() {
       const fileData = await uploadAPI.uploadFile(selectedFile);
       setUploading(false);
 
-      // Step 2: Create post
+      // Step 2: Create post with file metadata from upload
       const postData = {
         caption: caption || null,
         hashtags: hashtags || null,
         youtube_title: youtubeTitle || null,
         platforms: selectedPlatforms,
+        file_path: fileData.file_path,
+        file_name: fileData.file_name,
+        file_size: fileData.file_size,
+        file_type: fileData.file_type,
       };
 
       if (scheduleType === 'later' && scheduleDate && scheduleTime) {

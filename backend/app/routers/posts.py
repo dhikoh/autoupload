@@ -73,6 +73,10 @@ def create_post(
         caption=req.caption,
         hashtags=req.hashtags,
         youtube_title=req.youtube_title,
+        file_path=req.file_path,
+        file_name=req.file_name,
+        file_size=req.file_size,
+        file_type=req.file_type,
         status="queued",
         scheduled_at=req.schedule_at,
     )

@@ -6,7 +6,7 @@ Every field is explicitly typed. No leaking of internal fields.
 from __future__ import annotations
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 
 
 # ── Auth ───────────────────────────────────────────────
@@ -65,6 +65,11 @@ class PostCreateRequest(BaseModel):
     youtube_title: Optional[str] = None
     platforms: list[str] = Field(..., min_length=1)
     schedule_at: Optional[datetime] = None
+    # File metadata from /api/upload response
+    file_path: Optional[str] = None
+    file_name: Optional[str] = None
+    file_size: Optional[float] = None
+    file_type: Optional[str] = None
 
 
 class PostPlatformResponse(BaseModel):
