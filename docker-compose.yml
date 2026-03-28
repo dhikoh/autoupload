@@ -1,0 +1,45 @@
+# ── AutoPost Hub — Docker Compose ──
+# Deploy on Coolify: push to GitHub → Coolify auto-deploy
+# Local dev: docker-compose up --build
+
+services:
+  # FastAPI Backend
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-key-change-in-production}
+      - DATABASE_URL=sqlite:///./autopost.db
+      - UPLOAD_DIR=./uploads
+      - REDIS_URL=redis://redis:6379/0
+      - USE_CELERY=false
+      - FRONTEND_URL=http://localhost:3000
+    volumes:
+      - backend-data:/app/uploads
+      - backend-db:/app
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  # Redis (for Celery task queue — optional in sync mode)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  # Next.js Frontend
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://backend:8000
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  backend-data:
+  backend-db:
