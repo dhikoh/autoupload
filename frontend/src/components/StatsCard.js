@@ -3,19 +3,19 @@
 export default function StatsCard({ icon: Icon, label, value, trend, trendUp }) {
   return (
     <>
-      <div className="stats-card glass-card">
-        <div className="stats-card-header">
-          <div className="stats-card-icon">
-            <Icon size={20} />
-          </div>
-          {trend && (
-            <span className={`stats-card-trend ${trendUp ? 'up' : 'down'}`}>
-              {trendUp ? '↑' : '↓'} {trend}
-            </span>
-          )}
+      <div className="stats-card neuglass-card">
+        <div className="stats-icon-wrap">
+          <Icon size={20} />
         </div>
-        <div className="stats-card-value">{value}</div>
-        <div className="stats-card-label">{label}</div>
+        <div className="stats-info">
+          <span className="stats-value">{value}</span>
+          <span className="stats-label">{label}</span>
+        </div>
+        {trend && (
+          <span className={`stats-trend ${trendUp ? 'up' : 'down'}`}>
+            {trendUp ? '↑' : '↓'} {trend}
+          </span>
+        )}
       </div>
 
       <style jsx>{`
@@ -23,54 +23,78 @@ export default function StatsCard({ icon: Icon, label, value, trend, trendUp }) 
           padding: var(--space-5);
           display: flex;
           flex-direction: column;
-          gap: var(--space-2);
+          gap: var(--space-4);
+          position: relative;
+          overflow: hidden;
         }
 
-        .stats-card-header {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
+        .stats-card::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 3px;
+          background: var(--gradient-primary);
+          opacity: 0;
+          transition: opacity var(--transition-base);
         }
 
-        .stats-card-icon {
-          width: 40px;
-          height: 40px;
+        .stats-card:hover::before {
+          opacity: 1;
+        }
+
+        .stats-icon-wrap {
+          width: 44px;
+          height: 44px;
           border-radius: var(--radius-md);
-          background: rgba(124, 58, 237, 0.12);
+          background: var(--bg-primary);
+          box-shadow: var(--neu-shadow-in-sm);
           display: flex;
           align-items: center;
           justify-content: center;
           color: var(--primary-400);
         }
 
-        .stats-card-trend {
-          font-size: 0.75rem;
-          font-weight: 600;
-          padding: 2px 8px;
-          border-radius: var(--radius-full);
+        .stats-info {
+          display: flex;
+          flex-direction: column;
         }
 
-        .stats-card-trend.up {
-          background: var(--success-bg);
-          color: var(--success-400);
-        }
-
-        .stats-card-trend.down {
-          background: var(--error-bg);
-          color: var(--error-400);
-        }
-
-        .stats-card-value {
+        .stats-value {
           font-size: 1.75rem;
           font-weight: 800;
-          color: var(--text-primary);
+          letter-spacing: -0.03em;
           line-height: 1;
         }
 
-        .stats-card-label {
-          font-size: 0.8125rem;
+        .stats-label {
+          font-size: 0.75rem;
           color: var(--text-tertiary);
-          font-weight: 500;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          margin-top: var(--space-1);
+        }
+
+        .stats-trend {
+          position: absolute;
+          top: var(--space-4);
+          right: var(--space-4);
+          font-size: 0.6875rem;
+          font-weight: 700;
+          padding: 3px 8px;
+          border-radius: var(--radius-sm);
+        }
+
+        .stats-trend.up {
+          color: var(--success-400);
+          background: var(--success-bg);
+        }
+
+        .stats-trend.down {
+          color: var(--error-400);
+          background: var(--error-bg);
         }
       `}</style>
     </>

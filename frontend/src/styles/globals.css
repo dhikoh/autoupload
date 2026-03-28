@@ -1,5 +1,6 @@
 /* ============================================
-   AutoPost Hub — Glassmorphism Design System
+   AutoPost Hub — NeuGlass Design System
+   Hybrid: Neumorphism + Glassmorphism
    ============================================ */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
@@ -29,18 +30,27 @@
   --gradient-glow: radial-gradient(circle at 50% 50%, rgba(124, 58, 237, 0.15), transparent 70%);
   --gradient-card-border: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.02));
 
-  /* Neutrals (Dark Mode) */
-  --bg-primary: #06060F;
-  --bg-secondary: #0C0C1D;
-  --bg-tertiary: #12122A;
-  --bg-elevated: #1A1A3E;
+  /* NeuGlass Base color */
+  --bg-primary: #10101E;
+  --bg-secondary: #14142A;
+  --bg-tertiary: #1A1A36;
+  --bg-elevated: #202048;
+  --bg-surface: #181832;
+
+  /* Neumorphic Shadows (Dark mode) */
+  --neu-shadow-dark: rgba(0, 0, 10, 0.55);
+  --neu-shadow-light: rgba(50, 50, 100, 0.12);
+  --neu-shadow-out: 6px 6px 14px var(--neu-shadow-dark), -6px -6px 14px var(--neu-shadow-light);
+  --neu-shadow-out-sm: 3px 3px 8px var(--neu-shadow-dark), -3px -3px 8px var(--neu-shadow-light);
+  --neu-shadow-in: inset 4px 4px 10px var(--neu-shadow-dark), inset -4px -4px 10px var(--neu-shadow-light);
+  --neu-shadow-in-sm: inset 2px 2px 6px var(--neu-shadow-dark), inset -2px -2px 6px var(--neu-shadow-light);
 
   /* Glass */
   --glass-bg: rgba(255, 255, 255, 0.04);
   --glass-bg-hover: rgba(255, 255, 255, 0.07);
   --glass-bg-active: rgba(255, 255, 255, 0.10);
-  --glass-border: rgba(255, 255, 255, 0.08);
-  --glass-border-hover: rgba(255, 255, 255, 0.15);
+  --glass-border: rgba(255, 255, 255, 0.07);
+  --glass-border-hover: rgba(255, 255, 255, 0.14);
   --glass-blur: 20px;
   --glass-blur-heavy: 40px;
 
@@ -86,18 +96,18 @@
   --space-16: 64px;
 
   /* Radius */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
   --radius-full: 9999px;
 
   /* Shadows */
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 20px rgba(124, 58, 237, 0.3);
-  --shadow-glow-sm: 0 0 10px rgba(124, 58, 237, 0.2);
+  --shadow-glow: 0 0 24px rgba(124, 58, 237, 0.35);
+  --shadow-glow-sm: 0 0 12px rgba(124, 58, 237, 0.2);
 
   /* Sidebar */
   --sidebar-width: 260px;
@@ -106,8 +116,8 @@
 
   /* Transitions */
   --transition-fast: 150ms ease;
-  --transition-base: 250ms ease;
-  --transition-slow: 400ms ease;
+  --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ---- Reset ---- */
@@ -115,6 +125,7 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
 html {
@@ -130,6 +141,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  min-height: 100vh;
 }
 
 a {
@@ -151,9 +163,9 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-primary);
 }
 
-h1 { font-size: 3rem; letter-spacing: -0.02em; }
-h2 { font-size: 2rem; letter-spacing: -0.015em; }
-h3 { font-size: 1.5rem; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2rem, 5vw, 3rem); letter-spacing: -0.03em; }
+h2 { font-size: clamp(1.5rem, 4vw, 2rem); letter-spacing: -0.02em; }
+h3 { font-size: clamp(1.125rem, 3vw, 1.5rem); letter-spacing: -0.01em; }
 h4 { font-size: 1.125rem; }
 h5 { font-size: 1rem; }
 
@@ -169,40 +181,77 @@ h5 { font-size: 1rem; }
 .text-secondary { color: var(--text-secondary); }
 .text-tertiary { color: var(--text-tertiary); }
 
-/* ---- Glassmorphism Card ---- */
-.glass-card {
-  background: var(--glass-bg);
+/* =============================================================
+   NEUGLASS CORE COMPONENTS
+   ============================================================= */
+
+/* Card — raised (timbul) + glass blur */
+.neuglass-card {
+  background: var(--bg-surface);
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
-  border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
+  box-shadow: var(--neu-shadow-out);
+  border: 1px solid var(--glass-border);
   transition: all var(--transition-base);
 }
 
-.glass-card:hover {
-  background: var(--glass-bg-hover);
+.neuglass-card:hover {
+  box-shadow: var(--neu-shadow-out), var(--shadow-glow-sm);
   border-color: var(--glass-border-hover);
-  box-shadow: var(--shadow-glow-sm);
+  transform: translateY(-2px);
 }
 
-.glass-card-static {
-  background: var(--glass-bg);
+/* Card static — raised (no hover effect) */
+.glass-card-static,
+.neuglass-card-static {
+  background: var(--bg-surface);
   backdrop-filter: blur(var(--glass-blur));
   -webkit-backdrop-filter: blur(var(--glass-blur));
-  border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
+  box-shadow: var(--neu-shadow-out);
+  border: 1px solid var(--glass-border);
 }
 
+/* Card interactive — hover lift + glow */
+.glass-card {
+  background: var(--bg-surface);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border-radius: var(--radius-lg);
+  box-shadow: var(--neu-shadow-out);
+  border: 1px solid var(--glass-border);
+  transition: all var(--transition-base);
+  cursor: pointer;
+}
+
+.glass-card:hover {
+  box-shadow: var(--neu-shadow-out), var(--shadow-glow-sm);
+  border-color: var(--glass-border-hover);
+  transform: translateY(-2px);
+}
+
+/* Card elevated */
 .glass-card-elevated {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--bg-elevated);
   backdrop-filter: blur(var(--glass-blur-heavy));
   -webkit-backdrop-filter: blur(var(--glass-blur-heavy));
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--neu-shadow-out), var(--shadow-md);
 }
 
-/* ---- Buttons ---- */
+/* Pressed/inset — tenggelam */
+.neuglass-pressed {
+  background: var(--bg-primary);
+  border-radius: var(--radius-md);
+  box-shadow: var(--neu-shadow-in);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+/* =============================================================
+   BUTTONS
+   ============================================================= */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -218,43 +267,66 @@ h5 { font-size: 1rem; }
   transition: all var(--transition-base);
   white-space: nowrap;
   line-height: 1;
+  position: relative;
+  letter-spacing: 0.01em;
 }
 
+.btn:active {
+  transform: scale(0.97);
+}
+
+/* Primary — gradient + neumorphic glow */
 .btn-primary {
   background: var(--gradient-primary);
   color: #fff;
-  box-shadow: var(--shadow-glow-sm);
+  box-shadow:
+    var(--neu-shadow-out-sm),
+    0 4px 15px rgba(124, 58, 237, 0.3);
 }
 .btn-primary:hover {
-  box-shadow: var(--shadow-glow);
-  transform: translateY(-1px);
+  box-shadow:
+    var(--neu-shadow-out-sm),
+    0 6px 20px rgba(124, 58, 237, 0.45);
+  transform: translateY(-2px);
   filter: brightness(1.1);
 }
 .btn-primary:active {
-  transform: translateY(0);
+  box-shadow: var(--neu-shadow-in-sm);
+  transform: scale(0.97);
   filter: brightness(0.95);
 }
 
+/* Secondary — glass + neumorphic */
 .btn-secondary {
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur));
+  background: var(--bg-surface);
   color: var(--text-primary);
   border: 1px solid var(--glass-border);
+  box-shadow: var(--neu-shadow-out-sm);
 }
 .btn-secondary:hover {
-  background: var(--glass-bg-hover);
+  background: var(--bg-tertiary);
   border-color: var(--glass-border-hover);
 }
+.btn-secondary:active {
+  box-shadow: var(--neu-shadow-in-sm);
+}
 
+/* Outline */
 .btn-outline {
   background: transparent;
   color: var(--primary-400);
   border: 1px solid var(--primary-500);
+  box-shadow: var(--neu-shadow-out-sm);
 }
 .btn-outline:hover {
   background: rgba(124, 58, 237, 0.1);
+  box-shadow: var(--neu-shadow-out-sm), var(--shadow-glow-sm);
+}
+.btn-outline:active {
+  box-shadow: var(--neu-shadow-in-sm);
 }
 
+/* Ghost */
 .btn-ghost {
   background: transparent;
   color: var(--text-secondary);
@@ -264,16 +336,25 @@ h5 { font-size: 1rem; }
   background: var(--glass-bg);
   color: var(--text-primary);
 }
+.btn-ghost:active {
+  box-shadow: var(--neu-shadow-in-sm);
+}
 
+/* Danger */
 .btn-danger {
   background: rgba(239, 68, 68, 0.15);
   color: var(--error-400);
   border: 1px solid rgba(239, 68, 68, 0.3);
+  box-shadow: var(--neu-shadow-out-sm);
 }
 .btn-danger:hover {
   background: rgba(239, 68, 68, 0.25);
 }
+.btn-danger:active {
+  box-shadow: var(--neu-shadow-in-sm);
+}
 
+/* Sizes */
 .btn-lg {
   padding: var(--space-4) var(--space-8);
   font-size: 1rem;
@@ -286,37 +367,67 @@ h5 { font-size: 1rem; }
   border-radius: var(--radius-sm);
 }
 
+/* Icon button — circular neumorphic */
 .btn-icon {
   padding: var(--space-3);
   border-radius: var(--radius-md);
 }
 
-/* ---- Inputs ---- */
+.btn-neu-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: var(--bg-surface);
+  box-shadow: var(--neu-shadow-out-sm);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  color: var(--text-secondary);
+}
+
+.btn-neu-icon:hover {
+  color: var(--text-primary);
+}
+
+.btn-neu-icon:active {
+  box-shadow: var(--neu-shadow-in-sm);
+  color: var(--primary-400);
+}
+
+/* =============================================================
+   INPUTS — Inset/pressed neumorphic
+   ============================================================= */
 .input-field {
   width: 100%;
   padding: var(--space-3) var(--space-4);
-  background: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur));
-  border: 1px solid var(--glass-border);
+  background: var(--bg-primary);
+  border: 1px solid rgba(255, 255, 255, 0.04);
   border-radius: var(--radius-md);
   color: var(--text-primary);
   font-family: 'Inter', sans-serif;
   font-size: 0.875rem;
+  font-weight: 500;
   transition: all var(--transition-base);
   outline: none;
+  box-shadow: var(--neu-shadow-in-sm);
 }
 
 .input-field::placeholder {
   color: var(--text-tertiary);
+  font-weight: 400;
 }
 
 .input-field:focus {
   border-color: var(--primary-500);
-  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+  box-shadow: var(--neu-shadow-in), 0 0 0 3px rgba(124, 58, 237, 0.12);
+  color: var(--primary-300);
 }
 
 .input-field:hover:not(:focus) {
-  border-color: var(--glass-border-hover);
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 textarea.input-field {
@@ -331,12 +442,19 @@ textarea.input-field {
 }
 
 .input-label {
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
-/* ---- Checkbox / Toggle ---- */
+/* =============================================================
+   CHECKBOX / TOGGLE
+   ============================================================= */
 .toggle-switch {
   position: relative;
   width: 44px;
@@ -354,9 +472,10 @@ textarea.input-field {
 .toggle-slider {
   position: absolute;
   inset: 0;
-  background: var(--glass-bg-active);
-  border: 1px solid var(--glass-border);
+  background: var(--bg-primary);
+  border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: var(--radius-full);
+  box-shadow: var(--neu-shadow-in-sm);
   transition: var(--transition-base);
 }
 
@@ -367,32 +486,42 @@ textarea.input-field {
   width: 18px;
   left: 2px;
   bottom: 2px;
-  background: var(--text-secondary);
+  background: var(--text-tertiary);
   border-radius: 50%;
   transition: var(--transition-base);
+  box-shadow: 2px 2px 4px rgba(0,0,0,0.3);
 }
 
 .toggle-switch input:checked + .toggle-slider {
-  background: var(--primary-500);
-  border-color: var(--primary-400);
+  background: var(--primary-700);
+  border-color: var(--primary-500);
+  box-shadow: var(--neu-shadow-in-sm), 0 0 8px rgba(124, 58, 237, 0.2);
 }
 
 .toggle-switch input:checked + .toggle-slider::before {
   transform: translateX(20px);
   background: #fff;
+  box-shadow: 0 0 6px rgba(124, 58, 237, 0.4);
 }
 
-/* ---- Badges ---- */
+/* =============================================================
+   BADGES
+   ============================================================= */
 .badge {
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  padding: 2px 10px;
-  border-radius: var(--radius-full);
+  padding: 3px 10px;
+  border-radius: var(--radius-sm);
   font-size: 0.6875rem;
-  font-weight: 600;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.badge-sm {
+  padding: 2px 6px;
+  font-size: 0.5625rem;
 }
 
 .badge-success {
@@ -451,13 +580,16 @@ textarea.input-field {
   border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
-/* ---- Progress Bar ---- */
+/* =============================================================
+   PROGRESS BAR — Inset neumorphic track
+   ============================================================= */
 .progress-bar {
   width: 100%;
-  height: 6px;
-  background: var(--glass-bg-active);
+  height: 8px;
+  background: var(--bg-primary);
   border-radius: var(--radius-full);
   overflow: hidden;
+  box-shadow: var(--neu-shadow-in-sm);
 }
 
 .progress-fill {
@@ -465,9 +597,48 @@ textarea.input-field {
   background: var(--gradient-primary);
   border-radius: var(--radius-full);
   transition: width var(--transition-slow);
+  box-shadow: 0 0 8px rgba(124, 58, 237, 0.3);
 }
 
-/* ---- Dropdown Menu ---- */
+/* =============================================================
+   DATA TABLE
+   ============================================================= */
+.data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.data-table th {
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.data-table td {
+  padding: var(--space-3) var(--space-4);
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  vertical-align: middle;
+}
+
+.data-table tr {
+  transition: background var(--transition-fast);
+}
+
+.data-table tr:hover td {
+  background: rgba(124, 58, 237, 0.03);
+}
+
+/* =============================================================
+   DROPDOWN
+   ============================================================= */
 .dropdown {
   position: relative;
   display: inline-block;
@@ -475,14 +646,14 @@ textarea.input-field {
 
 .dropdown-menu {
   position: absolute;
-  top: calc(100% + 4px);
+  top: calc(100% + 6px);
   right: 0;
   min-width: 180px;
-  background: rgba(20, 20, 50, 0.95);
+  background: var(--bg-elevated);
   backdrop-filter: blur(var(--glass-blur-heavy));
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--neu-shadow-out), var(--shadow-lg);
   padding: var(--space-2);
   z-index: 100;
   opacity: 0;
@@ -510,41 +681,13 @@ textarea.input-field {
 }
 
 .dropdown-item:hover {
-  background: var(--glass-bg-hover);
+  background: rgba(124, 58, 237, 0.08);
   color: var(--text-primary);
 }
 
-/* ---- Table ---- */
-.data-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-}
-
-.data-table th {
-  padding: var(--space-3) var(--space-4);
-  text-align: left;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  border-bottom: 1px solid var(--glass-border);
-}
-
-.data-table td {
-  padding: var(--space-3) var(--space-4);
-  font-size: 0.875rem;
-  color: var(--text-secondary);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-  vertical-align: middle;
-}
-
-.data-table tr:hover td {
-  background: var(--glass-bg);
-}
-
-/* ---- Tooltip ---- */
+/* =============================================================
+   TOOLTIP
+   ============================================================= */
 .tooltip {
   position: relative;
 }
@@ -552,13 +695,14 @@ textarea.input-field {
 .tooltip::after {
   content: attr(data-tip);
   position: absolute;
-  bottom: calc(100% + 6px);
+  bottom: calc(100% + 8px);
   left: 50%;
-  transform: translateX(-50%) scale(0.95);
-  padding: 4px 10px;
-  background: rgba(20, 20, 50, 0.95);
+  transform: translateX(-50%) scale(0.9);
+  padding: 5px 12px;
+  background: var(--bg-elevated);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-sm);
+  box-shadow: var(--neu-shadow-out-sm);
   font-size: 0.6875rem;
   color: var(--text-primary);
   white-space: nowrap;
@@ -575,14 +719,16 @@ textarea.input-field {
   transform: translateX(-50%) scale(1);
 }
 
-/* ---- Animations ---- */
+/* =============================================================
+   ANIMATIONS
+   ============================================================= */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(20px); }
+  from { opacity: 0; transform: translateY(24px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
@@ -591,28 +737,21 @@ textarea.input-field {
   to   { opacity: 1; transform: translateX(0); }
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
-}
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
 @keyframes glow {
-  0%, 100% { box-shadow: 0 0 20px rgba(124, 58, 237, 0.2); }
-  50% { box-shadow: 0 0 40px rgba(124, 58, 237, 0.4); }
+  0%, 100% { box-shadow: var(--neu-shadow-out), 0 0 20px rgba(124, 58, 237, 0.15); }
+  50% { box-shadow: var(--neu-shadow-out), 0 0 40px rgba(124, 58, 237, 0.35); }
 }
 
 @keyframes float {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-10px); }
+  50% { transform: translateY(-8px); }
 }
 
-.animate-fade-in { animation: fadeIn 0.5s ease forwards; }
-.animate-fade-in-up { animation: fadeInUp 0.6s ease forwards; }
+.animate-fade-in { animation: fadeIn 0.5s var(--transition-base) forwards; }
+.animate-fade-in-up { animation: fadeInUp 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
 .animate-slide-in-left { animation: slideInLeft 0.4s ease forwards; }
 .animate-pulse { animation: pulse 2s ease-in-out infinite; }
 .animate-spin { animation: spin 1s linear infinite; }
@@ -626,26 +765,17 @@ textarea.input-field {
 .delay-4 { animation-delay: 0.4s; opacity: 0; }
 .delay-5 { animation-delay: 0.5s; opacity: 0; }
 
-/* ---- Scrollbar ---- */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
+/* =============================================================
+   SCROLLBAR
+   ============================================================= */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(124, 58, 237, 0.15); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(124, 58, 237, 0.3); }
 
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-/* ---- Background Decorations ---- */
+/* =============================================================
+   BACKGROUND DECORATIONS
+   ============================================================= */
 .bg-glow {
   position: fixed;
   border-radius: 50%;
@@ -655,22 +785,20 @@ textarea.input-field {
 }
 
 .bg-glow-1 {
-  width: 600px;
-  height: 600px;
-  background: rgba(124, 58, 237, 0.08);
-  top: -200px;
-  right: -100px;
+  width: 600px; height: 600px;
+  background: rgba(124, 58, 237, 0.06);
+  top: -200px; right: -100px;
 }
 
 .bg-glow-2 {
-  width: 500px;
-  height: 500px;
-  background: rgba(37, 99, 235, 0.06);
-  bottom: -200px;
-  left: -100px;
+  width: 500px; height: 500px;
+  background: rgba(37, 99, 235, 0.04);
+  bottom: -200px; left: -100px;
 }
 
-/* ---- Layout: Dashboard Shell ---- */
+/* =============================================================
+   LAYOUT: DESKTOP DASHBOARD SHELL
+   ============================================================= */
 .app-layout {
   display: flex;
   min-height: 100vh;
@@ -689,20 +817,23 @@ textarea.input-field {
   max-width: 1400px;
 }
 
-/* ---- Responsive ---- */
+/* =============================================================
+   LAYOUT: PWA MOBILE (XPDC HUB STYLE)
+   ============================================================= */
 @media (max-width: 768px) {
-  h1 { font-size: 2rem; }
-  h2 { font-size: 1.5rem; }
-  h3 { font-size: 1.25rem; }
+  h1 { font-size: 1.75rem; }
+  h2 { font-size: 1.375rem; }
+  h3 { font-size: 1.125rem; }
 
   .main-content {
     margin-left: 0;
   }
 
   .page-content {
-    padding: var(--space-4);
-    padding-top: calc(var(--topbar-height) + var(--space-4));
-    padding-bottom: 80px; /* space for bottom nav */
+    padding: var(--space-5) var(--space-4);
+    padding-top: calc(var(--topbar-height) + var(--space-5));
+    padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+    max-width: 100%;
   }
 
   .hide-mobile { display: none !important; }
@@ -712,7 +843,9 @@ textarea.input-field {
   .hide-desktop { display: none !important; }
 }
 
-/* ---- Utility Classes ---- */
+/* =============================================================
+   UTILITY CLASSES
+   ============================================================= */
 .flex { display: flex; }
 .flex-col { flex-direction: column; }
 .flex-wrap { flex-wrap: wrap; }

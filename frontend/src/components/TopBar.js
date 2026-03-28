@@ -1,40 +1,28 @@
 'use client';
-import { Search, Bell, ChevronDown, Menu } from 'lucide-react';
-import { useState } from 'react';
+import { Search, Bell, ChevronDown, Zap } from 'lucide-react';
 
-export default function TopBar({ title = 'Dashboard' }) {
-  const [searchFocused, setSearchFocused] = useState(false);
-
+export default function TopBar({ title }) {
   return (
     <>
       <header className="topbar">
         <div className="topbar-left">
-          <button className="topbar-menu-btn hide-desktop">
-            <Menu size={20} />
-          </button>
-          <h4 className="topbar-title">{title}</h4>
+          <h2 className="topbar-title">{title}</h2>
         </div>
 
         <div className="topbar-right">
-          <div className={`topbar-search ${searchFocused ? 'focused' : ''}`}>
-            <Search size={16} className="topbar-search-icon" />
-            <input
-              type="text"
-              placeholder="Search..."
-              className="topbar-search-input"
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => setSearchFocused(false)}
-            />
+          <div className="topbar-search hide-mobile">
+            <Search size={15} />
+            <input type="text" placeholder="Search..." />
           </div>
 
           <button className="topbar-icon-btn" aria-label="Notifications">
             <Bell size={18} />
-            <span className="topbar-notification-dot"></span>
+            <span className="topbar-badge">3</span>
           </button>
 
           <div className="topbar-user">
-            <div className="topbar-user-avatar">U</div>
-            <ChevronDown size={14} className="topbar-user-chevron" />
+            <div className="topbar-avatar">U</div>
+            <ChevronDown size={14} />
           </div>
         </div>
       </header>
@@ -46,40 +34,23 @@ export default function TopBar({ title = 'Dashboard' }) {
           right: 0;
           left: var(--sidebar-width);
           height: var(--topbar-height);
-          background: rgba(6, 6, 15, 0.8);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          border-bottom: 1px solid var(--glass-border);
           display: flex;
           align-items: center;
           justify-content: space-between;
           padding: 0 var(--space-8);
+          background: var(--bg-secondary);
+          backdrop-filter: blur(30px);
+          -webkit-backdrop-filter: blur(30px);
+          border-bottom: 1px solid var(--glass-border);
           z-index: 40;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
           transition: left var(--transition-base);
         }
 
-        .topbar-left {
-          display: flex;
-          align-items: center;
-          gap: var(--space-4);
-        }
-
         .topbar-title {
-          font-weight: 700;
-          color: var(--text-primary);
-        }
-
-        .topbar-menu-btn {
-          width: 36px;
-          height: 36px;
-          border-radius: var(--radius-md);
-          background: var(--glass-bg);
-          border: 1px solid var(--glass-border);
-          color: var(--text-secondary);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
+          font-size: 1.125rem;
+          font-weight: 800;
+          letter-spacing: -0.02em;
         }
 
         .topbar-right {
@@ -92,72 +63,79 @@ export default function TopBar({ title = 'Dashboard' }) {
           position: relative;
           display: flex;
           align-items: center;
-          width: 220px;
-          transition: width var(--transition-base);
         }
 
-        .topbar-search.focused {
-          width: 300px;
-        }
-
-        .topbar-search-icon {
+        .topbar-search :global(svg) {
           position: absolute;
-          left: 12px;
+          left: 14px;
           color: var(--text-tertiary);
-          pointer-events: none;
         }
 
-        .topbar-search-input {
-          width: 100%;
-          padding: 8px 12px 8px 38px;
-          background: var(--glass-bg);
-          border: 1px solid var(--glass-border);
+        .topbar-search input {
+          width: 220px;
+          padding: var(--space-2) var(--space-4) var(--space-2) 38px;
+          background: var(--bg-primary);
+          border: 1px solid rgba(255, 255, 255, 0.04);
           border-radius: var(--radius-full);
           color: var(--text-primary);
           font-family: 'Inter', sans-serif;
           font-size: 0.8125rem;
           outline: none;
           transition: all var(--transition-base);
+          box-shadow: var(--neu-shadow-in-sm);
         }
 
-        .topbar-search-input::placeholder {
-          color: var(--text-tertiary);
-        }
-
-        .topbar-search-input:focus {
+        .topbar-search input:focus {
           border-color: var(--primary-500);
-          box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.1);
+          box-shadow: var(--neu-shadow-in-sm), 0 0 0 3px rgba(124, 58, 237, 0.1);
+          width: 280px;
+        }
+
+        .topbar-search input::placeholder {
+          color: var(--text-tertiary);
         }
 
         .topbar-icon-btn {
           position: relative;
-          width: 36px;
-          height: 36px;
-          border-radius: var(--radius-md);
-          background: var(--glass-bg);
-          border: 1px solid var(--glass-border);
+          width: 38px;
+          height: 38px;
+          border-radius: 50%;
+          background: var(--bg-surface);
+          border: none;
           color: var(--text-secondary);
           display: flex;
           align-items: center;
           justify-content: center;
           cursor: pointer;
-          transition: all var(--transition-fast);
+          box-shadow: var(--neu-shadow-out-sm);
+          transition: all var(--transition-base);
         }
 
         .topbar-icon-btn:hover {
-          background: var(--glass-bg-hover);
           color: var(--text-primary);
         }
 
-        .topbar-notification-dot {
+        .topbar-icon-btn:active {
+          box-shadow: var(--neu-shadow-in-sm);
+          color: var(--primary-400);
+        }
+
+        .topbar-badge {
           position: absolute;
-          top: 7px;
-          right: 8px;
-          width: 7px;
-          height: 7px;
-          background: var(--error-500);
+          top: -2px;
+          right: -2px;
+          width: 18px;
+          height: 18px;
           border-radius: 50%;
-          border: 1.5px solid var(--bg-primary);
+          background: var(--gradient-primary);
+          color: #fff;
+          font-size: 0.6rem;
+          font-weight: 800;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border: 2px solid var(--bg-secondary);
+          box-shadow: 0 0 6px rgba(124, 58, 237, 0.5);
         }
 
         .topbar-user {
@@ -165,8 +143,8 @@ export default function TopBar({ title = 'Dashboard' }) {
           align-items: center;
           gap: var(--space-2);
           cursor: pointer;
-          padding: 4px;
-          border-radius: var(--radius-md);
+          padding: var(--space-1);
+          border-radius: var(--radius-full);
           transition: background var(--transition-fast);
         }
 
@@ -174,31 +152,30 @@ export default function TopBar({ title = 'Dashboard' }) {
           background: var(--glass-bg);
         }
 
-        .topbar-user-avatar {
-          width: 32px;
-          height: 32px;
-          border-radius: var(--radius-full);
+        .topbar-avatar {
+          width: 34px;
+          height: 34px;
+          border-radius: 50%;
           background: var(--gradient-primary);
           display: flex;
           align-items: center;
           justify-content: center;
-          font-size: 0.75rem;
+          font-size: 0.8125rem;
           font-weight: 700;
           color: #fff;
-        }
-
-        .topbar-user-chevron {
-          color: var(--text-tertiary);
+          box-shadow: 0 2px 8px rgba(124, 58, 237, 0.25);
         }
 
         @media (max-width: 768px) {
           .topbar {
             left: 0;
-            padding: 0 var(--space-4);
+            padding: 0 var(--space-5);
+            background: var(--bg-secondary);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
           }
 
-          .topbar-search {
-            display: none;
+          .topbar-title {
+            font-size: 1rem;
           }
         }
       `}</style>
