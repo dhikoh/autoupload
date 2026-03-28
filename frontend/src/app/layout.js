@@ -1,4 +1,5 @@
 import '../styles/globals.css';
+import { AuthProvider } from '@/context/AuthContext';
 
 export const metadata = {
   title: 'AutoPost Hub — Upload Once, Post Everywhere',
@@ -19,7 +20,9 @@ export default function RootLayout({ children }) {
       <body>
         <div className="bg-glow bg-glow-1" />
         <div className="bg-glow bg-glow-2" />
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

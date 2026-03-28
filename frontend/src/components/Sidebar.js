@@ -14,6 +14,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { useState } from 'react';
+import { useAuth } from '@/context/AuthContext';
 
 const navItems = [
   { href: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -37,6 +38,7 @@ const mobileNavItems = [
 export default function Sidebar() {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const { user, logout } = useAuth();
 
   const isActive = (href) =>
     href === '/dashboard' ? pathname === href : pathname.startsWith(href);
@@ -83,17 +85,17 @@ export default function Sidebar() {
         <div className="sidebar-footer">
           <div className="sidebar-user">
             <div className="sidebar-avatar">
-              <span>U</span>
+              <span>{user?.name?.charAt(0)?.toUpperCase() || 'U'}</span>
             </div>
             {!collapsed && (
               <div className="sidebar-user-info">
-                <span className="sidebar-user-name">User</span>
-                <span className="sidebar-user-plan">Free Plan</span>
+                <span className="sidebar-user-name">{user?.name || 'User'}</span>
+                <span className="sidebar-user-plan">{(user?.plan || 'free').charAt(0).toUpperCase() + (user?.plan || 'free').slice(1)} Plan</span>
               </div>
             )}
           </div>
           {!collapsed && (
-            <button className="btn btn-ghost btn-sm sidebar-logout">
+            <button className="btn btn-ghost btn-sm sidebar-logout" onClick={logout}>
               <LogOut size={16} />
             </button>
           )}
