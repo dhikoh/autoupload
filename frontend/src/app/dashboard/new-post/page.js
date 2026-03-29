@@ -8,7 +8,8 @@ import {
   CalendarDays, Clock, Send, Loader2
 } from 'lucide-react';
 import { YouTubeIcon, FacebookIcon, InstagramIcon, TikTokIcon, XIcon as XBrandIcon, ThreadsIcon } from '../../../components/PlatformBadge';
-import { uploadAPI, postsAPI, accountsAPI } from '@/lib/api';
+import { uploadAPI, postsAPI, accountsAPI, settingsAPI } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
 
 const platformMeta = {
   youtube: { name: 'YouTube', icon: YouTubeIcon },
@@ -43,13 +44,17 @@ export default function NewPostPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [uploadPrice, setUploadPrice] = useState(1000);
+  const { user } = useAuth();
 
   // Fetch connected accounts on mount
   useEffect(() => {
     accountsAPI.list().then(accounts => {
       setConnectedAccounts(accounts || []);
-      // Pre-select connected platforms
       setSelectedPlatforms((accounts || []).map(a => a.platform));
+    }).catch(() => {});
+    settingsAPI.getPublic().then(s => {
+      setUploadPrice(parseFloat(s.upload_price) || 1000);
     }).catch(() => {});
   }, []);
 

@@ -1,6 +1,6 @@
 """
 AutoPost Hub — Posts Router
-POST   /api/posts            — create post + queue upload
+POST   /api/posts            — create post + queue upload (deducts balance)
 GET    /api/posts             — list user's posts
 GET    /api/posts/{id}        — post detail with platform status
 POST   /api/posts/{id}/retry  — retry failed platforms
@@ -16,12 +16,18 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.deps import get_db, get_current_user
-from app.models import User, Post, PostPlatform, ConnectedAccount
+from app.models import User, Post, PostPlatform, ConnectedAccount, AppSetting, BalanceTransaction
 from app.schemas import PostCreateRequest, PostResponse, PostListResponse, DashboardStats
 from app.workers.tasks import process_post
 from app.workers.cleanup import force_cleanup
 
 router = APIRouter(prefix="/api/posts", tags=["Posts"])
+
+
+def _get_upload_price(db: Session) -> float:
+    """Get current upload price from settings."""
+    s = db.query(AppSetting).filter(AppSetting.key == "upload_price").first()
+    return float(s.value) if s else 1000.0
 
 
 @router.get("/stats", response_model=DashboardStats)
@@ -35,7 +41,7 @@ def dashboard_stats(
         Post.user_id == user.id, Post.scheduled_at.isnot(None), Post.status == "queued"
     ).scalar() or 0
 
-    # Success rate: count successful PostPlatforms / total PostPlatforms
+    # Success rate
     total_pp = db.query(func.count(PostPlatform.id)).join(Post).filter(Post.user_id == user.id).scalar() or 0
     success_pp = db.query(func.count(PostPlatform.id)).join(Post).filter(
         Post.user_id == user.id, PostPlatform.status == "success"
@@ -46,11 +52,15 @@ def dashboard_stats(
         ConnectedAccount.user_id == user.id
     ).scalar() or 0
 
+    price = _get_upload_price(db)
+
     return DashboardStats(
         total_posts=total,
         scheduled=scheduled,
         success_rate=rate,
         connected_accounts=accounts,
+        balance=user.balance,
+        upload_price=price,
     )
 
 
@@ -60,12 +70,34 @@ def create_post(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Create a new post and queue it for upload to selected platforms."""
+    """Create a new post and queue it for upload. Deducts balance."""
     # Validate platforms
     valid_platforms = {"youtube", "facebook", "instagram", "tiktok", "x", "threads"}
     for p in req.platforms:
         if p not in valid_platforms:
             raise HTTPException(400, detail=f"Platform tidak valid: {p}")
+
+    # Check balance (price per file upload, not per platform)
+    price = _get_upload_price(db)
+    if user.role == "tenant" and user.balance < price:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=f"Saldo tidak cukup. Butuh Rp {price:,.0f}, saldo Anda Rp {user.balance:,.0f}. Silakan top-up.",
+        )
+
+    # Deduct balance (admin/staff exempt)
+    cost = 0.0
+    if user.role == "tenant":
+        cost = price
+        user.balance -= cost
+        tx = BalanceTransaction(
+            user_id=user.id,
+            amount=-cost,
+            type="deduct",
+            balance_after=user.balance,
+            description=f"Upload ke {', '.join(req.platforms)}",
+        )
+        db.add(tx)
 
     # Create the post
     post = Post(
@@ -77,15 +109,19 @@ def create_post(
         file_name=req.file_name,
         file_size=req.file_size,
         file_type=req.file_type,
+        cost=cost,
         status="queued",
         scheduled_at=req.schedule_at,
     )
     db.add(post)
-    db.flush()  # Get post.id without committing
+    db.flush()
 
-    # Create PostPlatform records for each selected platform
+    # Set reference_id on transaction
+    if user.role == "tenant":
+        tx.reference_id = post.id
+
+    # Create PostPlatform records
     for platform in req.platforms:
-        # Find connected account for this platform (optional)
         account = db.query(ConnectedAccount).filter(
             ConnectedAccount.user_id == user.id,
             ConnectedAccount.platform == platform,
@@ -102,7 +138,7 @@ def create_post(
     db.commit()
     db.refresh(post)
 
-    # Process in background thread (sync mode, no Celery needed)
+    # Process in background
     thread = Thread(target=process_post, args=(post.id,), daemon=True)
     thread.start()
 
@@ -151,7 +187,7 @@ def retry_post(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Retry failed platform uploads for a post."""
+    """Retry failed platform uploads for a post (no additional charge)."""
     post = db.query(Post).filter(Post.id == post_id, Post.user_id == user.id).first()
     if not post:
         raise HTTPException(404, detail="Post tidak ditemukan")
@@ -162,7 +198,6 @@ def retry_post(
     if not post.file_path:
         raise HTTPException(400, detail="File sudah dihapus, tidak bisa retry")
 
-    # Reset failed platforms to pending
     failed_platforms = db.query(PostPlatform).filter(
         PostPlatform.post_id == post_id,
         PostPlatform.status == "failed",
@@ -179,7 +214,6 @@ def retry_post(
     db.commit()
     db.refresh(post)
 
-    # Process retry in background
     thread = Thread(target=process_post, args=(post.id,), daemon=True)
     thread.start()
 
@@ -197,9 +231,6 @@ def delete_post(
     if not post:
         raise HTTPException(404, detail="Post tidak ditemukan")
 
-    # Force cleanup file from disk
     force_cleanup(post_id, db)
-
-    # Delete post (cascade deletes PostPlatform records)
     db.delete(post)
     db.commit()

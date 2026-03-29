@@ -12,16 +12,9 @@ const features = [
 ];
 
 const steps = [
-  { num: '01', title: 'Connect Accounts', desc: 'Link your social media accounts via secure OAuth authentication.' },
-  { num: '02', title: 'Upload Content', desc: 'Drag & drop your video or image. Add captions customized per platform.' },
-  { num: '03', title: 'Auto-Publish', desc: 'Hit publish and watch your content go live everywhere instantly.' },
-];
-
-const plans = [
-  { name: 'Free', price: 'Rp 0', period: '/forever', features: ['3 platforms', '10 posts/month', '1 account', 'Basic analytics'], cta: 'Get Started', popular: false },
-  { name: 'Starter', price: 'Rp 99K', period: '/month', features: ['5 platforms', '50 posts/month', '3 accounts', 'Scheduling', 'Priority support'], cta: 'Start Trial', popular: false },
-  { name: 'Pro', price: 'Rp 249K', period: '/month', features: ['All platforms', 'Unlimited posts', '10 accounts', 'Advanced scheduling', 'Analytics dashboard', 'Priority support'], cta: 'Go Pro', popular: true },
-  { name: 'Agency', price: 'Rp 599K', period: '/month', features: ['Everything in Pro', 'Unlimited accounts', 'Team collaboration', 'API access', 'White-label ready', 'Dedicated support'], cta: 'Contact Us', popular: false },
+  { num: '01', title: 'Daftar & Top-Up', desc: 'Buat akun gratis, top-up saldo via transfer bank. Tanpa langganan bulanan.' },
+  { num: '02', title: 'Hubungkan Akun', desc: 'Sambungkan akun sosmed Anda — YouTube, Instagram, TikTok, dan lainnya.' },
+  { num: '03', title: 'Upload & Auto-Post', desc: 'Upload file, pilih platform, dan konten langsung terpublish otomatis.' },
 ];
 
 const platformIcons = [
@@ -60,18 +53,18 @@ export default function LandingPage() {
         <div className="hero-glow" />
         <div className="hero-content animate-fade-in-up">
           <div className="hero-badge">
-            <Zap size={14} /> Now supporting 6 platforms
+            <Zap size={14} /> Mulai dari Rp 1.000/upload
           </div>
-          <h1>Upload Once,<br /><span className="text-gradient">Post Everywhere</span></h1>
+          <h1>Upload Sekali,<br /><span className="text-gradient">Posting ke Semua</span></h1>
           <p className="hero-subtitle">
-            Publish your content to YouTube, Instagram, TikTok, Facebook, X, and Threads — all from one dashboard. Save hours every day.
+            Publish konten ke YouTube, Instagram, TikTok, Facebook, X, dan Threads — dari satu dashboard. Tanpa langganan, bayar per upload.
           </p>
           <div className="hero-actions">
             <Link href="/register" className="btn btn-primary btn-lg">
-              Get Started Free <ArrowRight size={18} />
+              Mulai Sekarang <ArrowRight size={18} />
             </Link>
-            <Link href="#features" className="btn btn-secondary btn-lg">
-              See Features
+            <Link href="#pricing" className="btn btn-secondary btn-lg">
+              Lihat Harga
             </Link>
           </div>
           {/* Platform icons */}
@@ -123,27 +116,55 @@ export default function LandingPage() {
       {/* ===== PRICING ===== */}
       <section id="pricing" className="section">
         <div className="section-inner">
-          <h2 className="section-title">Simple Pricing</h2>
-          <p className="section-subtitle">Start free, upgrade when you need more</p>
-          <div className="pricing-grid">
-            {plans.map((plan, i) => (
-              <div key={i} className={`pricing-card glass-card ${plan.popular ? 'pricing-popular' : ''}`}>
-                {plan.popular && <div className="pricing-popular-badge">Most Popular</div>}
-                <h3>{plan.name}</h3>
-                <div className="pricing-price">
-                  <span className="pricing-amount">{plan.price}</span>
-                  <span className="pricing-period">{plan.period}</span>
-                </div>
-                <ul className="pricing-features">
-                  {plan.features.map((feat, j) => (
-                    <li key={j}><Check size={16} /> {feat}</li>
-                  ))}
-                </ul>
-                <button className={`btn w-full ${plan.popular ? 'btn-primary' : 'btn-secondary'}`}>
-                  {plan.cta}
-                </button>
+          <h2 className="section-title">Bayar Sesuai Pemakaian</h2>
+          <p className="section-subtitle">Tanpa langganan bulanan. Top-up saldo, upload, selesai.</p>
+          <div className="pricing-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)', maxWidth: '900px', margin: '0 auto' }}>
+            <div className="pricing-card glass-card">
+              <div className="feature-icon" style={{ margin: '0 0 var(--space-4)' }}>💰</div>
+              <h3>Pay Per Upload</h3>
+              <div className="pricing-price">
+                <span className="pricing-amount">Rp 1.000</span>
+                <span className="pricing-period">/file upload</span>
               </div>
-            ))}
+              <ul className="pricing-features">
+                <li><Check size={16} /> Semua 6 platform</li>
+                <li><Check size={16} /> Tanpa batas upload</li>
+                <li><Check size={16} /> Multi-akun sosmed</li>
+                <li><Check size={16} /> Scheduling</li>
+              </ul>
+              <Link href="/register" className="btn btn-primary w-full">Daftar Gratis</Link>
+            </div>
+            <div className="pricing-card glass-card pricing-popular">
+              <div className="pricing-popular-badge">Rekomendasi</div>
+              <div className="feature-icon" style={{ margin: '0 0 var(--space-4)' }}>🚀</div>
+              <h3>Top-Up Rp 100K</h3>
+              <div className="pricing-price">
+                <span className="pricing-amount">100 Upload</span>
+                <span className="pricing-period">saldo tidak expired</span>
+              </div>
+              <ul className="pricing-features">
+                <li><Check size={16} /> Semua fitur</li>
+                <li><Check size={16} /> Saldo tidak hangus</li>
+                <li><Check size={16} /> Real-time tracking</li>
+                <li><Check size={16} /> Customer support</li>
+              </ul>
+              <Link href="/register" className="btn btn-primary w-full">Mulai Sekarang</Link>
+            </div>
+            <div className="pricing-card glass-card">
+              <div className="feature-icon" style={{ margin: '0 0 var(--space-4)' }}>🏢</div>
+              <h3>Top-Up Rp 500K</h3>
+              <div className="pricing-price">
+                <span className="pricing-amount">500 Upload</span>
+                <span className="pricing-period">untuk content creator</span>
+              </div>
+              <ul className="pricing-features">
+                <li><Check size={16} /> Semua fitur</li>
+                <li><Check size={16} /> Volume terbanyak</li>
+                <li><Check size={16} /> Priority support</li>
+                <li><Check size={16} /> Retry gratis</li>
+              </ul>
+              <Link href="/register" className="btn btn-primary w-full">Daftar Sekarang</Link>
+            </div>
           </div>
         </div>
       </section>

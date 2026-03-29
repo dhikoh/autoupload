@@ -31,7 +31,6 @@ def add_account(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    # Check if user already connected this platform
     existing = db.query(ConnectedAccount).filter(
         ConnectedAccount.user_id == user.id,
         ConnectedAccount.platform == req.platform,
@@ -45,6 +44,7 @@ def add_account(
     account = ConnectedAccount(
         user_id=user.id,
         platform=req.platform,
+        platform_username=req.platform_username,
         access_token=req.access_token,
         refresh_token=req.refresh_token,
         profile_name=req.profile_name,
@@ -64,7 +64,7 @@ def disconnect_account(
 ):
     account = db.query(ConnectedAccount).filter(
         ConnectedAccount.id == account_id,
-        ConnectedAccount.user_id == user.id,  # Ownership check
+        ConnectedAccount.user_id == user.id,
     ).first()
     if not account:
         raise HTTPException(status_code=404, detail="Akun tidak ditemukan")

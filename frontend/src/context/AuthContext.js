@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { authAPI, setToken, removeToken } from '@/lib/api';
+import { authAPI, setToken, removeToken, setRole, removeRole } from '@/lib/api';
 
 const AuthContext = createContext(null);
 
@@ -12,21 +12,27 @@ export function AuthProvider({ children }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  // Check auth on mount
-  useEffect(() => {
-    checkAuth();
-  }, []);
+  useEffect(() => { checkAuth(); }, []);
 
-  // Route protection
   useEffect(() => {
     if (!loading) {
       const isAuthPage = pathname === '/login' || pathname === '/register';
       const isDashboard = pathname.startsWith('/dashboard');
+      const isAdmin = pathname.startsWith('/admin');
+      const isPublic = pathname === '/' || isAuthPage;
 
-      if (!user && isDashboard) {
+      if (!user && (isDashboard || isAdmin)) {
         router.replace('/login');
       }
       if (user && isAuthPage) {
+        if (user.role === 'superadmin' || user.role === 'staff') {
+          router.replace('/admin');
+        } else {
+          router.replace('/dashboard');
+        }
+      }
+      // Block tenants from admin
+      if (user && isAdmin && user.role === 'tenant') {
         router.replace('/dashboard');
       }
     }
@@ -35,14 +41,12 @@ export function AuthProvider({ children }) {
   async function checkAuth() {
     try {
       const token = typeof window !== 'undefined' ? localStorage.getItem('autopost_token') : null;
-      if (!token) {
-        setLoading(false);
-        return;
-      }
+      if (!token) { setLoading(false); return; }
       const userData = await authAPI.me();
       setUser(userData);
     } catch {
       removeToken();
+      removeRole();
       setUser(null);
     } finally {
       setLoading(false);
@@ -52,15 +56,21 @@ export function AuthProvider({ children }) {
   const login = useCallback(async (email, password) => {
     const data = await authAPI.login(email, password);
     setToken(data.access_token);
+    setRole(data.role);
     const userData = await authAPI.me();
     setUser(userData);
-    router.replace('/dashboard');
+    if (data.role === 'superadmin' || data.role === 'staff') {
+      router.replace('/admin');
+    } else {
+      router.replace('/dashboard');
+    }
     return userData;
   }, [router]);
 
   const register = useCallback(async (email, name, password) => {
     const data = await authAPI.register(email, name, password);
     setToken(data.access_token);
+    setRole(data.role);
     const userData = await authAPI.me();
     setUser(userData);
     router.replace('/dashboard');
@@ -69,12 +79,17 @@ export function AuthProvider({ children }) {
 
   const logout = useCallback(() => {
     removeToken();
+    removeRole();
     setUser(null);
     router.replace('/login');
   }, [router]);
 
+  const isAdmin = user?.role === 'superadmin';
+  const isStaff = user?.role === 'staff';
+  const isAdminOrStaff = isAdmin || isStaff;
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, isAdmin, isStaff, isAdminOrStaff }}>
       {children}
     </AuthContext.Provider>
   );

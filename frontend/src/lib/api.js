@@ -6,41 +6,41 @@
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-/**
- * Get stored JWT token from localStorage.
- */
 function getToken() {
   if (typeof window === 'undefined') return null;
   return localStorage.getItem('autopost_token');
 }
 
-/**
- * Store JWT token in localStorage.
- */
 export function setToken(token) {
   if (typeof window === 'undefined') return;
   localStorage.setItem('autopost_token', token);
 }
 
-/**
- * Remove JWT token (logout).
- */
 export function removeToken() {
   if (typeof window === 'undefined') return;
   localStorage.removeItem('autopost_token');
 }
 
-/**
- * Core fetch wrapper with auth header and error handling.
- */
+export function getRole() {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('autopost_role');
+}
+
+export function setRole(role) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem('autopost_role', role);
+}
+
+export function removeRole() {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('autopost_role');
+}
+
 async function apiFetch(endpoint, options = {}) {
   const token = getToken();
 
-  const headers = {
-    ...(options.headers || {}),
-  };
+  const headers = { ...(options.headers || {}) };
 
-  // Only set Content-Type for non-FormData requests
   if (!(options.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
   }
@@ -49,32 +49,19 @@ async function apiFetch(endpoint, options = {}) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${API_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  const res = await fetch(`${API_URL}${endpoint}`, { ...options, headers });
 
-  // Handle 401 — auto logout
   if (res.status === 401) {
     removeToken();
-    if (typeof window !== 'undefined') {
-      window.location.href = '/login';
-    }
+    removeRole();
+    if (typeof window !== 'undefined') window.location.href = '/login';
     throw new Error('Session expired');
   }
 
-  // Handle 204 No Content
-  if (res.status === 204) {
-    return null;
-  }
+  if (res.status === 204) return null;
 
-  // Parse response
   const data = await res.json();
-
-  if (!res.ok) {
-    throw new Error(data.detail || `Error ${res.status}`);
-  }
-
+  if (!res.ok) throw new Error(data.detail || `Error ${res.status}`);
   return data;
 }
 
@@ -102,10 +89,7 @@ export const uploadAPI = {
   uploadFile: (file) => {
     const formData = new FormData();
     formData.append('file', file);
-    return apiFetch('/api/upload', {
-      method: 'POST',
-      body: formData,
-    });
+    return apiFetch('/api/upload', { method: 'POST', body: formData });
   },
 };
 
@@ -113,10 +97,7 @@ export const uploadAPI = {
 
 export const postsAPI = {
   create: (data) =>
-    apiFetch('/api/posts', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
+    apiFetch('/api/posts', { method: 'POST', body: JSON.stringify(data) }),
 
   list: (params = {}) => {
     const query = new URLSearchParams();
@@ -129,13 +110,8 @@ export const postsAPI = {
   },
 
   get: (id) => apiFetch(`/api/posts/${id}`),
-
-  retry: (id) =>
-    apiFetch(`/api/posts/${id}/retry`, { method: 'POST' }),
-
-  delete: (id) =>
-    apiFetch(`/api/posts/${id}`, { method: 'DELETE' }),
-
+  retry: (id) => apiFetch(`/api/posts/${id}/retry`, { method: 'POST' }),
+  delete: (id) => apiFetch(`/api/posts/${id}`, { method: 'DELETE' }),
   stats: () => apiFetch('/api/posts/stats'),
 };
 
@@ -143,15 +119,98 @@ export const postsAPI = {
 
 export const accountsAPI = {
   list: () => apiFetch('/api/accounts'),
-
   connect: (data) =>
-    apiFetch('/api/accounts', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-
+    apiFetch('/api/accounts', { method: 'POST', body: JSON.stringify(data) }),
   disconnect: (id) =>
     apiFetch(`/api/accounts/${id}`, { method: 'DELETE' }),
+};
+
+// ── Top-Up & Balance ──────────────────────────
+
+export const topupAPI = {
+  create: (amount, proofFile) => {
+    const formData = new FormData();
+    formData.append('amount', amount);
+    formData.append('proof', proofFile);
+    return apiFetch('/api/topup', { method: 'POST', body: formData });
+  },
+
+  list: (params = {}) => {
+    const query = new URLSearchParams();
+    if (params.limit) query.set('limit', params.limit);
+    if (params.offset) query.set('offset', params.offset);
+    const qs = query.toString();
+    return apiFetch(`/api/topup${qs ? `?${qs}` : ''}`);
+  },
+
+  balance: () => apiFetch('/api/balance'),
+};
+
+// ── Public Settings ───────────────────────────
+
+export const settingsAPI = {
+  getPublic: () => apiFetch('/api/settings/public'),
+};
+
+// ── Admin ─────────────────────────────────────
+
+export const adminAPI = {
+  stats: () => apiFetch('/api/admin/stats'),
+
+  // Users
+  users: (params = {}) => {
+    const query = new URLSearchParams();
+    if (params.role) query.set('role', params.role);
+    if (params.search) query.set('search', params.search);
+    if (params.limit) query.set('limit', params.limit);
+    if (params.offset) query.set('offset', params.offset);
+    const qs = query.toString();
+    return apiFetch(`/api/admin/users${qs ? `?${qs}` : ''}`);
+  },
+
+  getUser: (id) => apiFetch(`/api/admin/users/${id}`),
+
+  addBalance: (userId, amount, description) =>
+    apiFetch(`/api/admin/users/${userId}/balance`, {
+      method: 'POST',
+      body: JSON.stringify({ amount, description }),
+    }),
+
+  toggleSuspend: (userId) =>
+    apiFetch(`/api/admin/users/${userId}/suspend`, { method: 'POST' }),
+
+  // Staff
+  createStaff: (data) =>
+    apiFetch('/api/admin/staff', { method: 'POST', body: JSON.stringify(data) }),
+
+  deleteStaff: (id) =>
+    apiFetch(`/api/admin/staff/${id}`, { method: 'DELETE' }),
+
+  // Top-ups
+  topups: (params = {}) => {
+    const query = new URLSearchParams();
+    if (params.status) query.set('status', params.status);
+    if (params.limit) query.set('limit', params.limit);
+    if (params.offset) query.set('offset', params.offset);
+    const qs = query.toString();
+    return apiFetch(`/api/admin/topups${qs ? `?${qs}` : ''}`);
+  },
+
+  reviewTopup: (id, action, note) =>
+    apiFetch(`/api/admin/topups/${id}/review`, {
+      method: 'POST',
+      body: JSON.stringify({ action, note }),
+    }),
+
+  // Settings
+  getSettings: () => apiFetch('/api/admin/settings'),
+
+  updateSettings: (data) =>
+    apiFetch('/api/admin/settings', { method: 'PUT', body: JSON.stringify(data) }),
+
+  // Ranking
+  ranking: (limit = 20) =>
+    apiFetch(`/api/admin/ranking?limit=${limit}`),
 };
 
 // ── Health ────────────────────────────────────

@@ -5,10 +5,11 @@ import StatsCard from '../../components/StatsCard';
 import PlatformBadge from '../../components/PlatformBadge';
 import Link from 'next/link';
 import {
-  BarChart3, CalendarDays, CheckCircle2, Link2,
+  BarChart3, CalendarDays, CheckCircle2, Link2, Wallet,
   ArrowUpRight, Plus, Clock, MoreHorizontal, Loader2
 } from 'lucide-react';
 import { postsAPI } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
 
 function timeAgo(dateStr) {
   if (!dateStr) return '';
@@ -28,6 +29,7 @@ function statusBadge(s) {
 }
 
 export default function DashboardPage() {
+  const { user } = useAuth();
   const [stats, setStats] = useState(null);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -66,6 +68,29 @@ export default function DashboardPage() {
       <TopBar title="Dashboard" />
       <div className="page-content">
         {/* Stats */}
+        {/* Balance Card */}
+        <div className="glass-card-static animate-fade-in" style={{
+          padding: 'var(--space-6)',
+          marginBottom: 'var(--space-6)',
+          background: 'linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.15))',
+          borderColor: 'rgba(99,102,241,0.25)',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem'
+        }}>
+          <div>
+            <p style={{ color: 'var(--text-tertiary)', margin: 0, fontSize: '0.85rem' }}>Saldo Anda</p>
+            <h2 style={{ color: '#fff', margin: '0.25rem 0 0', fontSize: '1.8rem' }}>
+              Rp {(user?.balance || stats?.balance || 0).toLocaleString('id-ID')}
+            </h2>
+            <p style={{ color: 'var(--text-tertiary)', margin: '0.25rem 0 0', fontSize: '0.8rem' }}>
+              Harga upload: Rp {(stats?.upload_price || 1000).toLocaleString('id-ID')}/file
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <Link href="/dashboard/topup" className="btn btn-primary">💳 Top-Up</Link>
+            <Link href="/dashboard/balance" className="btn btn-ghost">📋 Riwayat</Link>
+          </div>
+        </div>
+
         <div className="stats-grid animate-fade-in">
           <StatsCard icon={BarChart3} label="Total Posts" value={stats?.total_posts ?? 0} />
           <StatsCard icon={CalendarDays} label="Scheduled" value={stats?.scheduled ?? 0} />

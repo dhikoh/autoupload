@@ -18,7 +18,6 @@ router = APIRouter(prefix="/api/auth", tags=["Auth"])
 
 @router.post("/register", response_model=TokenResponse, status_code=201)
 def register(req: RegisterRequest, db: Session = Depends(get_db)):
-    # Check duplicate email
     existing = db.query(User).filter(User.email == req.email.lower().strip()).first()
     if existing:
         raise HTTPException(
@@ -30,13 +29,15 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
         email=req.email.lower().strip(),
         name=req.name.strip(),
         password_hash=hash_password(req.password),
+        role="tenant",
+        balance=0.0,
     )
     db.add(user)
     db.commit()
     db.refresh(user)
 
-    token = create_access_token(user.id)
-    return TokenResponse(access_token=token)
+    token = create_access_token(user.id, user.role)
+    return TokenResponse(access_token=token, role=user.role)
 
 
 @router.post("/login", response_model=TokenResponse)
@@ -47,9 +48,14 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email atau password salah",
         )
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Akun Anda telah disuspend. Hubungi admin.",
+        )
 
-    token = create_access_token(user.id)
-    return TokenResponse(access_token=token)
+    token = create_access_token(user.id, user.role)
+    return TokenResponse(access_token=token, role=user.role)
 
 
 @router.get("/me", response_model=UserResponse)
