@@ -1,9 +1,17 @@
 # ── AutoPost Hub — Docker Compose (Production) ──
 # Domain: up.modula.click (frontend) | api.up.modula.click (backend)
 #
-# Usage:
-#   1. Copy backend/.env.example to backend/.env and fill in values
-#   2. docker compose up -d
+# DATABASE OPTIONS:
+#
+#   OPTION A — SQLite (default, simple, cocok untuk < 100 user concurrent):
+#     DATABASE_URL=sqlite:////app/data/autopost.db
+#     Uncomment: volumes backend-db
+#
+#   OPTION B — PostgreSQL (recommended untuk production skala besar):
+#     1. Uncomment service 'postgres' di bawah
+#     2. Ubah DATABASE_URL di backend environment:
+#        DATABASE_URL=postgresql://autopost:${POSTGRES_PASSWORD}@postgres:5432/autopost_db
+#     3. Hapus volume backend-db (db tidak lagi di file)
 
 services:
   # ── FastAPI Backend ────────────────────────────
@@ -14,29 +22,43 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # Security
+      # ── Security ──
       SECRET_KEY: ${SECRET_KEY}
-      # Superadmin (required on first run)
+
+      # ── Superadmin (required first run) ──
       SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL}
       SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD}
       SUPERADMIN_NAME: ${SUPERADMIN_NAME:-Super Admin}
-      # Database
-      DATABASE_URL: sqlite:////app/data/autopost.db
-      # File storage
+
+      # ── Database ──
+      # SQLite (default):
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////app/data/autopost.db}
+      # PostgreSQL (ganti DATABASE_URL di .env jika pakai postgres):
+      # DATABASE_URL: postgresql://autopost:${POSTGRES_PASSWORD}@postgres:5432/autopost_db
+
+      # ── Storage ──
       UPLOAD_DIR: /app/uploads
       MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-500}
-      # CORS
+
+      # ── CORS ──
       FRONTEND_URL: ${FRONTEND_URL:-https://up.modula.click}
-      # Token
+
+      # ── Auth ──
       ACCESS_TOKEN_EXPIRE_DAYS: ${ACCESS_TOKEN_EXPIRE_DAYS:-7}
-      # Celery (disabled by default — uses sync mode)
+
+      # ── Celery/Redis (opsional, default sync mode) ──
       REDIS_URL: redis://redis:6379/0
       USE_CELERY: ${USE_CELERY:-false}
+
+      # ── APScheduler (primary worker only) ──
+      WORKER_ID: "0"
+
     volumes:
       - backend-uploads:/app/uploads
-      - backend-db:/app/data
+      - backend-db:/app/data        # SQLite data dir (hapus jika pakai PostgreSQL)
     depends_on:
       - redis
+      # - postgres    # Uncomment jika pakai PostgreSQL
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
@@ -45,7 +67,7 @@ services:
       retries: 3
       start_period: 15s
 
-  # ── Redis (optional — for Celery async mode) ───
+  # ── Redis (for Celery async mode — optional) ───
   redis:
     image: redis:7-alpine
     restart: unless-stopped
@@ -56,6 +78,22 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+
+  # ── PostgreSQL (OPTION B — uncomment untuk production skala besar) ──
+  # postgres:
+  #   image: postgres:16-alpine
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_DB: autopost_db
+  #     POSTGRES_USER: autopost
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U autopost -d autopost_db"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
 
   # ── Next.js Frontend ───────────────────────────
   frontend:
@@ -79,5 +117,6 @@ services:
 
 volumes:
   backend-uploads:
-  backend-db:
+  backend-db:        # SQLite data (hapus jika pakai PostgreSQL)
   redis-data:
+  # postgres-data:   # Uncomment jika pakai PostgreSQL

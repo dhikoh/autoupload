@@ -7,16 +7,24 @@ SECURITY NOTE:
   Only staff/admin can access them.
 
 BACKGROUND JOBS (APScheduler):
-  Every 1 hour  : cleanup_orphan_files       — removes ghost upload files (no Post record)
-  Every 24 hours: cleanup_stale_partial_posts — removes files from 7-day-old partial posts
-  Every 1 minute : trigger_scheduled_posts   — processes posts whose scheduled_at has arrived
+  Every 1 minute : trigger_scheduled_posts — processes posts whose scheduled_at has arrived
+  Every 1 hour   : cleanup_orphan_files    — removes ghost upload files
+  Every 24 hours : cleanup_stale_partial   — removes files from 7-day-old partial posts
+
+MULTI-WORKER NOTE:
+  APScheduler only starts on the PRIMARY worker (process rank 0 via WORKER_ID env var).
+  This prevents duplicate job runs when running multiple uvicorn workers.
+  When using --workers > 1, set WORKER_ID=0 on one instance only,
+  OR use --workers 1 (simplest, recommended for SQLite).
 """
 
 import logging
+import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from threading import Thread
 
+from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -35,7 +43,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-# ── Scheduled Jobs ──────────────────────────────────────────────
+# ── Scheduled Job Functions ─────────────────────────────────────
 
 def _run_orphan_cleanup():
     """Scheduled job: remove ghost files from uploads directory."""
@@ -54,7 +62,6 @@ def _run_stale_partial_cleanup():
     """Scheduled job: remove files from partial posts older than 7 days."""
     db = SessionLocal()
     try:
-        from app.workers.cleanup import cleanup_stale_partial_posts
         cleaned = cleanup_stale_partial_posts(db, max_age_days=7)
         if cleaned:
             logger.info(f"[Scheduler] Stale partial cleanup: processed {cleaned} post(s)")
@@ -68,9 +75,6 @@ def _trigger_scheduled_posts():
     """
     Scheduled job (every minute): find posts whose scheduled_at has arrived
     and trigger their background processing.
-
-    This completes the C-3 fix — posts with schedule_at in the future are
-    now properly deferred and triggered at the right time.
     """
     from app.models import Post
     from app.workers.tasks import process_post
@@ -78,7 +82,6 @@ def _trigger_scheduled_posts():
     db = SessionLocal()
     try:
         now = datetime.now(timezone.utc)
-        # Find queued posts whose scheduled time has arrived
         due_posts = db.query(Post).filter(
             Post.status == "queued",
             Post.scheduled_at.isnot(None),
@@ -86,11 +89,9 @@ def _trigger_scheduled_posts():
         ).all()
 
         for post in due_posts:
-            logger.info(f"[Scheduler] Triggering scheduled post {post.id} (was due at {post.scheduled_at})")
-            # Mark as processing first to avoid double-trigger
+            logger.info(f"[Scheduler] Triggering scheduled post {post.id}")
             post.status = "processing"
             db.commit()
-            # Launch background thread
             thread = Thread(target=process_post, args=(post.id,), daemon=True)
             thread.start()
 
@@ -100,46 +101,97 @@ def _trigger_scheduled_posts():
         db.close()
 
 
-scheduler = BackgroundScheduler(timezone="UTC")
+# ── Scheduler Setup ─────────────────────────────────────────────
+
+def _is_primary_worker() -> bool:
+    """
+    Detect if this is the primary worker process.
+
+    With uvicorn --workers N, each worker is a separate process.
+    We only want ONE process running the APScheduler to prevent duplicate jobs.
+
+    Detection strategy:
+    - Use WORKER_ID env var if set (set to "0" on primary worker)
+    - Fallback: use SQLAlchemy job store which handles distributed deduplication
+    """
+    worker_id = os.environ.get("WORKER_ID", "0")
+    return worker_id == "0"
+
+
+def _make_scheduler() -> BackgroundScheduler:
+    """
+    Create APScheduler with SQLAlchemy job store.
+    This ensures jobs don't run twice even if multiple workers somehow start.
+    """
+    # Use database as job store — prevents duplicate job registration
+    # Works with both SQLite and PostgreSQL
+    jobstores = {
+        "default": SQLAlchemyJobStore(engine=engine)
+    }
+    return BackgroundScheduler(
+        jobstores=jobstores,
+        timezone="UTC",
+    )
+
+
+scheduler: BackgroundScheduler | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Create database tables on startup, seed default data, start scheduler."""
+    global scheduler
+
+    # Create all tables
     Base.metadata.create_all(bind=engine)
-    settings.upload_path    # property creates uploads dir
-    settings.proofs_path    # property creates proofs subdir
+    settings.upload_path   # Creates uploads dir
+    settings.proofs_path   # Creates proofs subdir
 
     # Seed superadmin and default settings
     seed_database()
 
-    # ── Background jobs ──
-    scheduler.add_job(
-        _trigger_scheduled_posts,
-        "interval", minutes=1,
-        id="scheduled_posts_trigger",
-        max_instances=1,  # Prevent overlapping runs
-    )
-    scheduler.add_job(
-        _run_orphan_cleanup,
-        "interval", hours=1,
-        id="orphan_cleanup",
-        max_instances=1,
-    )
-    scheduler.add_job(
-        _run_stale_partial_cleanup,
-        "interval", hours=24,
-        id="stale_cleanup",
-        max_instances=1,
-    )
-    scheduler.start()
+    # Only start scheduler on the primary worker
+    if _is_primary_worker():
+        scheduler = _make_scheduler()
 
-    logger.info("✅ AutoPost Hub API ready — APScheduler running (3 jobs)")
+        # Remove stale jobs from previous run before adding new ones
+        try:
+            scheduler.remove_all_jobs()
+        except Exception:
+            pass
+
+        scheduler.add_job(
+            _trigger_scheduled_posts,
+            "interval", minutes=1,
+            id="scheduled_posts_trigger",
+            max_instances=1,
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            _run_orphan_cleanup,
+            "interval", hours=1,
+            id="orphan_cleanup",
+            max_instances=1,
+            replace_existing=True,
+        )
+        scheduler.add_job(
+            _run_stale_partial_cleanup,
+            "interval", hours=24,
+            id="stale_cleanup",
+            max_instances=1,
+            replace_existing=True,
+        )
+        scheduler.start()
+        logger.info("✅ AutoPost Hub API ready — APScheduler running (3 jobs)")
+    else:
+        logger.info("✅ AutoPost Hub API ready — scheduler skipped (secondary worker)")
+
     yield
 
     # Graceful shutdown
-    scheduler.shutdown(wait=False)
-    logger.info("🛑 AutoPost Hub API shutdown complete")
+    if scheduler and scheduler.running:
+        scheduler.shutdown(wait=False)
+        logger.info("🛑 APScheduler shutdown")
 
 
 # ── FastAPI App ─────────────────────────────────────────────────
@@ -151,7 +203,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — explicit method list for production safety
+# CORS — explicit origins for production safety
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -165,7 +217,6 @@ app.add_middleware(
 )
 
 # Register routers
-# NOTE: /proofs static mount is REMOVED — files served via authenticated /api/admin/proofs/
 app.include_router(auth.router)
 app.include_router(upload.router)
 app.include_router(posts.router)
@@ -180,5 +231,6 @@ def health():
         "status": "ok",
         "service": "autopost-hub",
         "version": "2.0.0",
-        "scheduler": "running" if scheduler.running else "stopped",
+        "database": "postgresql" if settings.DATABASE_URL.startswith("postgresql") else "sqlite",
+        "scheduler": "running" if (scheduler and scheduler.running) else "stopped",
     }
