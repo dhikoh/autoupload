@@ -50,8 +50,8 @@ export default function QueuePage() {
     } catch {} finally { setRetrying(null); }
   }
 
-  const activePosts = posts.filter(p => ['queued', 'processing', 'partial'].includes(p.status));
-  const donePosts = posts.filter(p => ['completed', 'failed'].includes(p.status));
+  const activePosts = posts.filter(p => ['queued', 'processing', 'partial', 'failed'].includes(p.status));
+  const donePosts = posts.filter(p => ['completed'].includes(p.status));
 
   return (
     <>
@@ -99,7 +99,7 @@ export default function QueuePage() {
                         </div>
                       ))}
                     </div>
-                    {post.status === 'partial' && (
+                    {(post.status === 'partial' || post.status === 'failed') && (
                       <button className="btn btn-outline btn-sm" onClick={() => handleRetry(post.id)}
                         disabled={retrying === post.id}>
                         {retrying === post.id ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} Retry Failed

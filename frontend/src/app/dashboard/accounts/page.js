@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import TopBar from '../../../components/TopBar';
 import { YouTubeIcon, FacebookIcon, InstagramIcon, TikTokIcon, XIcon as XBrandIcon, ThreadsIcon } from '../../../components/PlatformBadge';
-import { Link2, Plus, Trash2, Loader2, ExternalLink } from 'lucide-react';
+import { Link2, Plus, Trash2, Loader2 } from 'lucide-react';
 import { accountsAPI } from '@/lib/api';
 
 const platformMeta = {

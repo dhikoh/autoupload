@@ -5,7 +5,7 @@ import TopBar from '../../../components/TopBar';
 import PlatformBadge from '../../../components/PlatformBadge';
 import {
   Upload, Image, Film, X, Hash, Type,
-  CalendarDays, Clock, Send, Loader2
+  Clock, Send, Loader2
 } from 'lucide-react';
 import { YouTubeIcon, FacebookIcon, InstagramIcon, TikTokIcon, XIcon as XBrandIcon, ThreadsIcon } from '../../../components/PlatformBadge';
 import { uploadAPI, postsAPI, accountsAPI, settingsAPI } from '@/lib/api';
@@ -25,7 +25,6 @@ export default function NewPostPage() {
   const [connectedAccounts, setConnectedAccounts] = useState([]);
   const [selectedPlatforms, setSelectedPlatforms] = useState([]);
   const [scheduleType, setScheduleType] = useState('now');
-  const [sameCaption, setSameCaption] = useState(true);
   const [dragOver, setDragOver] = useState(false);
 
   // File state
@@ -93,25 +92,27 @@ export default function NewPostPage() {
 
     setSubmitting(true);
     try {
-      // Step 1: Upload file
+      // Step 1: Upload file — backend returns file_token (safe filename, no server path)
       setUploading(true);
       const fileData = await uploadAPI.uploadFile(selectedFile);
       setUploading(false);
 
-      // Step 2: Create post with file metadata from upload
+      // Step 2: Create post using file_token (server reconstructs full path securely)
       const postData = {
         caption: caption || null,
         hashtags: hashtags || null,
         youtube_title: youtubeTitle || null,
         platforms: selectedPlatforms,
-        file_path: fileData.file_path,
+        file_token: fileData.file_token,  // Safe token, not server path
         file_name: fileData.file_name,
         file_size: fileData.file_size,
         file_type: fileData.file_type,
       };
 
       if (scheduleType === 'later' && scheduleDate && scheduleTime) {
-        postData.schedule_at = `${scheduleDate}T${scheduleTime}:00`;
+        // Convert local datetime to UTC ISO string (prevents timezone scheduling errors)
+        const localDt = new Date(`${scheduleDate}T${scheduleTime}:00`);
+        postData.schedule_at = localDt.toISOString();
       }
 
       await postsAPI.create(postData);

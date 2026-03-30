@@ -12,6 +12,8 @@ import {
   LogOut,
   ChevronLeft,
   Zap,
+  Wallet,
+  CreditCard,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
@@ -21,6 +23,8 @@ const navItems = [
   { href: '/dashboard/new-post', icon: PlusCircle, label: 'New Post' },
   { href: '/dashboard/queue', icon: ListOrdered, label: 'Upload Queue' },
   { href: '/dashboard/accounts', icon: Link2, label: 'Accounts' },
+  { href: '/dashboard/topup', icon: CreditCard, label: 'Top-Up' },
+  { href: '/dashboard/balance', icon: Wallet, label: 'Saldo' },
   { href: '/dashboard/schedule', icon: CalendarDays, label: 'Schedule' },
   { href: '/dashboard/history', icon: History, label: 'History' },
   { href: '/dashboard/settings', icon: Settings, label: 'Settings' },
@@ -90,7 +94,7 @@ export default function Sidebar() {
             {!collapsed && (
               <div className="sidebar-user-info">
                 <span className="sidebar-user-name">{user?.name || 'User'}</span>
-                <span className="sidebar-user-plan">{(user?.plan || 'free').charAt(0).toUpperCase() + (user?.plan || 'free').slice(1)} Plan</span>
+                <span className="sidebar-user-plan">Rp {(user?.balance || 0).toLocaleString('id-ID')}</span>
               </div>
             )}
           </div>

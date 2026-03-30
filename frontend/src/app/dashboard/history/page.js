@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import TopBar from '../../../components/TopBar';
 import PlatformBadge from '../../../components/PlatformBadge';
-import { History, Search, Trash2, Loader2, Filter } from 'lucide-react';
+import { History, Search, Trash2, Loader2 } from 'lucide-react';
 import { postsAPI } from '@/lib/api';
 
 function statusBadge(s) {

@@ -81,9 +81,23 @@ export const authAPI = {
     }),
 
   me: () => apiFetch('/api/auth/me'),
+
+  updateProfile: (name) =>
+    apiFetch('/api/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify({ name }),
+    }),
+
+  changePassword: (current_password, new_password) =>
+    apiFetch('/api/auth/password', {
+      method: 'PUT',
+      body: JSON.stringify({ current_password, new_password }),
+    }),
 };
 
 // ── Upload ────────────────────────────────────
+// Returns: { file_token, file_name, file_size, file_type }
+// file_token = safe filename only (no server path exposed)
 
 export const uploadAPI = {
   uploadFile: (file) => {
@@ -119,8 +133,14 @@ export const postsAPI = {
 
 export const accountsAPI = {
   list: () => apiFetch('/api/accounts'),
+
   connect: (data) =>
     apiFetch('/api/accounts', { method: 'POST', body: JSON.stringify(data) }),
+
+  // Update account token/profile without disconnecting (e.g. after OAuth refresh)
+  update: (id, data) =>
+    apiFetch(`/api/accounts/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+
   disconnect: (id) =>
     apiFetch(`/api/accounts/${id}`, { method: 'DELETE' }),
 };
@@ -211,6 +231,10 @@ export const adminAPI = {
   // Ranking
   ranking: (limit = 20) =>
     apiFetch(`/api/admin/ranking?limit=${limit}`),
+
+  // Proof file URL — served via authenticated backend endpoint
+  proofUrl: (filename) =>
+    `${API_URL}/api/admin/proofs/${encodeURIComponent(filename)}`,
 };
 
 // ── Health ────────────────────────────────────

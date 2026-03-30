@@ -104,7 +104,10 @@ export default function AdminDashboard() {
               <tbody>
                 {pendingTopups.map(t => (
                   <tr key={t.id}>
-                    <td>{t.user_id}</td>
+                    <td>
+                      <strong>{t.user_name || 'Unknown'}</strong>
+                      <br /><span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>{t.user_email}</span>
+                    </td>
                     <td>Rp {t.amount.toLocaleString('id-ID')}</td>
                     <td>{new Date(t.created_at).toLocaleDateString('id-ID')}</td>
                     <td>

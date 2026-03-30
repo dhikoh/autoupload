@@ -5,8 +5,8 @@ import StatsCard from '../../components/StatsCard';
 import PlatformBadge from '../../components/PlatformBadge';
 import Link from 'next/link';
 import {
-  BarChart3, CalendarDays, CheckCircle2, Link2, Wallet,
-  ArrowUpRight, Plus, Clock, MoreHorizontal, Loader2
+  BarChart3, CalendarDays, CheckCircle2, Link2,
+  ArrowUpRight, Plus, Clock, Loader2
 } from 'lucide-react';
 import { postsAPI } from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
@@ -79,7 +79,7 @@ export default function DashboardPage() {
           <div>
             <p style={{ color: 'var(--text-tertiary)', margin: 0, fontSize: '0.85rem' }}>Saldo Anda</p>
             <h2 style={{ color: '#fff', margin: '0.25rem 0 0', fontSize: '1.8rem' }}>
-              Rp {(user?.balance || stats?.balance || 0).toLocaleString('id-ID')}
+              Rp {(user?.balance ?? stats?.balance ?? 0).toLocaleString('id-ID')}
             </h2>
             <p style={{ color: 'var(--text-tertiary)', margin: '0.25rem 0 0', fontSize: '0.8rem' }}>
               Harga upload: Rp {(stats?.upload_price || 1000).toLocaleString('id-ID')}/file

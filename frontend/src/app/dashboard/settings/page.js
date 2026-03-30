@@ -1,470 +1,220 @@
 'use client';
+
+import { useState, useEffect } from 'react';
 import TopBar from '../../../components/TopBar';
-import {
-  User, CreditCard, Bell, Key, Users,
-  Camera, Save, Eye, EyeOff, Copy, Trash2, Plus,
-  Check, Zap, Crown, Building2
-} from 'lucide-react';
-import { useState } from 'react';
+import { authAPI } from '@/lib/api';
+import { useAuth } from '@/context/AuthContext';
+import { User, Lock, Bell, Shield } from 'lucide-react';
 
-const tabs = [
-  { id: 'profile', label: 'Profile', icon: User },
-  { id: 'subscription', label: 'Subscription', icon: CreditCard },
-  { id: 'notifications', label: 'Notifications', icon: Bell },
-  { id: 'api', label: 'API Keys', icon: Key },
-  { id: 'team', label: 'Team', icon: Users },
-];
-
-const plans = [
-  { name: 'Free', price: 'Rp 0', icon: Zap, current: false, features: ['3 platforms', '10 posts/mo', '1 account'] },
-  { name: 'Starter', price: 'Rp 99K/mo', icon: Zap, current: true, features: ['5 platforms', '50 posts/mo', '3 accounts'] },
-  { name: 'Pro', price: 'Rp 249K/mo', icon: Crown, current: false, features: ['All platforms', 'Unlimited', '10 accounts'] },
-  { name: 'Agency', price: 'Rp 599K/mo', icon: Building2, current: false, features: ['Everything', 'Team', 'API'] },
-];
-
-const teamMembers = [
-  { name: 'John Doe', email: 'john@example.com', role: 'Admin', avatar: 'JD' },
-  { name: 'Jane Smith', email: 'jane@example.com', role: 'Member', avatar: 'JS' },
-];
-
-const apiKeys = [
-  { name: 'Production', key: 'aph_live_xxxx...xxxx1234', created: 'Mar 15, 2026' },
-  { name: 'Development', key: 'aph_test_xxxx...xxxx5678', created: 'Mar 20, 2026' },
+const TABS = [
+  { id: 'profile', label: 'Profil', icon: User },
+  { id: 'password', label: 'Password', icon: Lock },
+  { id: 'notifications', label: 'Notifikasi', icon: Bell },
+  { id: 'security', label: 'Keamanan', icon: Shield },
 ];
 
 export default function SettingsPage() {
+  const { user, checkAuth } = useAuth();
   const [activeTab, setActiveTab] = useState('profile');
-  const [showPassword, setShowPassword] = useState(false);
+
+  // Profile
+  const [name, setName] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileMsg, setProfileMsg] = useState('');
+  const [profileError, setProfileError] = useState('');
+
+  // Password
+  const [currentPw, setCurrentPw] = useState('');
+  const [newPw, setNewPw] = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
+  const [savingPw, setSavingPw] = useState(false);
+  const [pwMsg, setPwMsg] = useState('');
+  const [pwError, setPwError] = useState('');
+
+  useEffect(() => {
+    if (user) setName(user.name || '');
+  }, [user]);
+
+  async function handleSaveProfile(e) {
+    e.preventDefault();
+    if (!name.trim()) return setProfileError('Nama tidak boleh kosong');
+    setProfileError('');
+    setSavingProfile(true);
+    try {
+      await authAPI.updateProfile(name.trim());
+      await checkAuth(); // Refresh user context with new name
+      setProfileMsg('Profil berhasil diperbarui ✅');
+      setTimeout(() => setProfileMsg(''), 4000);
+    } catch (err) {
+      setProfileError(err.message);
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
+  async function handleChangePassword(e) {
+    e.preventDefault();
+    setPwError('');
+    if (!currentPw || !newPw || !confirmPw) return setPwError('Semua field wajib diisi');
+    if (newPw !== confirmPw) return setPwError('Password baru dan konfirmasi tidak sama');
+    if (newPw.length < 6) return setPwError('Password minimal 6 karakter');
+
+    setSavingPw(true);
+    try {
+      await authAPI.changePassword(currentPw, newPw);
+      setPwMsg('Password berhasil diubah ✅');
+      setCurrentPw(''); setNewPw(''); setConfirmPw('');
+      setTimeout(() => setPwMsg(''), 4000);
+    } catch (err) {
+      setPwError(err.message);
+    } finally {
+      setSavingPw(false);
+    }
+  }
 
   return (
     <>
-      <TopBar title="Settings" />
+      <TopBar title="Pengaturan" />
       <div className="page-content">
-        <div className="settings-layout">
-          {/* Tabs */}
-          <div className="settings-tabs glass-card-static">
-            {tabs.map(tab => (
-              <button
-                key={tab.id}
-                className={`settings-tab ${activeTab === tab.id ? 'active' : ''}`}
-                onClick={() => setActiveTab(tab.id)}
-              >
-                <tab.icon size={16} />
-                <span>{tab.label}</span>
-              </button>
-            ))}
+        <div style={styles.container}>
+          {/* Tab Navigation */}
+          <div style={styles.tabs}>
+            {TABS.map(tab => {
+              const Icon = tab.icon;
+              return (
+                <button key={tab.id}
+                  style={{ ...styles.tab, ...(activeTab === tab.id ? styles.tabActive : {}) }}
+                  onClick={() => setActiveTab(tab.id)}>
+                  <Icon size={16} />
+                  {tab.label}
+                </button>
+              );
+            })}
           </div>
 
-          {/* Content */}
-          <div className="settings-content">
-            {/* Profile */}
-            {activeTab === 'profile' && (
-              <div className="settings-panel animate-fade-in">
-                <div className="glass-card-static settings-section">
-                  <h3>Profile Information</h3>
-                  <div className="profile-avatar-section">
-                    <div className="profile-avatar">
-                      <span>U</span>
-                      <button className="profile-avatar-edit">
-                        <Camera size={14} />
-                      </button>
-                    </div>
-                    <div>
-                      <p className="text-sm text-secondary">Upload a photo (max 2MB)</p>
-                    </div>
-                  </div>
-                  <div className="settings-form-grid">
-                    <div className="input-group">
-                      <label className="input-label">Full Name</label>
-                      <input className="input-field" type="text" defaultValue="User" />
-                    </div>
-                    <div className="input-group">
-                      <label className="input-label">Email</label>
-                      <input className="input-field" type="email" defaultValue="user@example.com" readOnly style={{ opacity: 0.6 }} />
-                    </div>
-                  </div>
-                  <button className="btn btn-primary"><Save size={14} /> Save Changes</button>
+          {/* Profile Tab */}
+          {activeTab === 'profile' && (
+            <div style={styles.card}>
+              <h2 style={styles.cardTitle}>👤 Informasi Profil</h2>
+              {profileMsg && <div style={styles.success}>{profileMsg}</div>}
+              {profileError && <div style={styles.error}>{profileError}</div>}
+              <form onSubmit={handleSaveProfile}>
+                <div style={styles.field}>
+                  <label style={styles.label}>Email</label>
+                  <input type="email" style={{ ...styles.input, opacity: 0.5 }}
+                    value={user?.email || ''} disabled />
+                  <p style={styles.hint}>Email tidak dapat diubah</p>
                 </div>
+                <div style={styles.field}>
+                  <label style={styles.label}>Nama</label>
+                  <input type="text" style={styles.input} value={name}
+                    onChange={e => setName(e.target.value)} placeholder="Nama Anda" />
+                </div>
+                <div style={styles.field}>
+                  <label style={styles.label}>Role</label>
+                  <input type="text" style={{ ...styles.input, opacity: 0.5 }}
+                    value={user?.role || ''} disabled />
+                </div>
+                <button type="submit" disabled={savingProfile} style={styles.btn}>
+                  {savingProfile ? 'Menyimpan...' : '💾 Simpan Profil'}
+                </button>
+              </form>
+            </div>
+          )}
 
-                <div className="glass-card-static settings-section">
-                  <h3>Change Password</h3>
-                  <div className="settings-form-grid">
-                    <div className="input-group">
-                      <label className="input-label">Current Password</label>
-                      <div className="input-password-wrapper">
-                        <input className="input-field" type={showPassword ? 'text' : 'password'} placeholder="••••••••" />
-                        <button className="password-toggle" onClick={() => setShowPassword(!showPassword)}>
-                          {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                        </button>
-                      </div>
-                    </div>
-                    <div className="input-group">
-                      <label className="input-label">New Password</label>
-                      <input className="input-field" type="password" placeholder="Min. 8 characters" />
-                    </div>
-                    <div className="input-group">
-                      <label className="input-label">Confirm Password</label>
-                      <input className="input-field" type="password" placeholder="Re-enter password" />
-                    </div>
-                  </div>
-                  <button className="btn btn-primary"><Save size={14} /> Update Password</button>
+          {/* Password Tab */}
+          {activeTab === 'password' && (
+            <div style={styles.card}>
+              <h2 style={styles.cardTitle}>🔒 Ganti Password</h2>
+              {pwMsg && <div style={styles.success}>{pwMsg}</div>}
+              {pwError && <div style={styles.error}>{pwError}</div>}
+              <form onSubmit={handleChangePassword}>
+                <div style={styles.field}>
+                  <label style={styles.label}>Password Saat Ini</label>
+                  <input type="password" style={styles.input} value={currentPw}
+                    onChange={e => setCurrentPw(e.target.value)} placeholder="••••••••" />
+                </div>
+                <div style={styles.field}>
+                  <label style={styles.label}>Password Baru</label>
+                  <input type="password" style={styles.input} value={newPw}
+                    onChange={e => setNewPw(e.target.value)} placeholder="Min. 6 karakter" />
+                </div>
+                <div style={styles.field}>
+                  <label style={styles.label}>Konfirmasi Password Baru</label>
+                  <input type="password" style={styles.input} value={confirmPw}
+                    onChange={e => setConfirmPw(e.target.value)} placeholder="Ulangi password baru" />
+                </div>
+                <button type="submit" disabled={savingPw} style={styles.btn}>
+                  {savingPw ? 'Menyimpan...' : '🔑 Ubah Password'}
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* Notifications Tab */}
+          {activeTab === 'notifications' && (
+            <div style={styles.card}>
+              <h2 style={styles.cardTitle}>🔔 Notifikasi</h2>
+              <div style={styles.comingSoon}>
+                <Bell size={48} style={{ opacity: 0.3 }} />
+                <p>Pengaturan notifikasi akan segera hadir</p>
+                <p style={styles.comingSoonSub}>
+                  Email notifikasi saat upload selesai, top-up diproses, dll.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Security Tab */}
+          {activeTab === 'security' && (
+            <div style={styles.card}>
+              <h2 style={styles.cardTitle}>🛡️ Keamanan Akun</h2>
+              <div style={styles.securityItem}>
+                <div>
+                  <h3 style={styles.secTitle}>Sessions Aktif</h3>
+                  <p style={styles.secDesc}>Token login berlaku 7 hari sejak login terakhir</p>
                 </div>
               </div>
-            )}
-
-            {/* Subscription */}
-            {activeTab === 'subscription' && (
-              <div className="settings-panel animate-fade-in">
-                <div className="glass-card-static settings-section">
-                  <h3>Current Plan</h3>
-                  <div className="plan-cards">
-                    {plans.map(plan => (
-                      <div key={plan.name} className={`plan-card ${plan.current ? 'current' : ''}`}>
-                        <plan.icon size={20} />
-                        <h4>{plan.name}</h4>
-                        <span className="plan-price">{plan.price}</span>
-                        <ul>
-                          {plan.features.map((f, i) => <li key={i}><Check size={12} /> {f}</li>)}
-                        </ul>
-                        <button className={`btn btn-sm w-full ${plan.current ? 'btn-secondary' : 'btn-outline'}`}>
-                          {plan.current ? 'Current' : 'Upgrade'}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+              <div style={styles.securityItem}>
+                <div>
+                  <h3 style={styles.secTitle}>Two-Factor Authentication (2FA)</h3>
+                  <p style={styles.secDesc}>Akan segera hadir di versi berikutnya</p>
                 </div>
-
-                <div className="glass-card-static settings-section">
-                  <h3>Usage</h3>
-                  <div className="usage-bars">
-                    <div className="usage-item">
-                      <div className="usage-header">
-                        <span>Posts</span><span className="text-sm">23 / 50</span>
-                      </div>
-                      <div className="progress-bar"><div className="progress-fill" style={{ width: '46%' }} /></div>
-                    </div>
-                    <div className="usage-item">
-                      <div className="usage-header">
-                        <span>Accounts</span><span className="text-sm">2 / 3</span>
-                      </div>
-                      <div className="progress-bar"><div className="progress-fill" style={{ width: '66%' }} /></div>
-                    </div>
-                  </div>
-                </div>
+                <span style={styles.comingSoonBadge}>Coming Soon</span>
               </div>
-            )}
-
-            {/* Notifications */}
-            {activeTab === 'notifications' && (
-              <div className="settings-panel animate-fade-in">
-                <div className="glass-card-static settings-section">
-                  <h3>Email Notifications</h3>
-                  <div className="notification-list">
-                    {[
-                      { label: 'Upload completed', desc: 'Receive email when uploads finish', checked: true },
-                      { label: 'Upload failed', desc: 'Get notified about failed uploads', checked: true },
-                      { label: 'Weekly summary', desc: 'Weekly report of your post performance', checked: false },
-                      { label: 'Product updates', desc: 'News about new features and improvements', checked: true },
-                    ].map((item, i) => (
-                      <div key={i} className="notification-item">
-                        <div>
-                          <span className="notification-label">{item.label}</span>
-                          <span className="text-xs text-tertiary">{item.desc}</span>
-                        </div>
-                        <label className="toggle-switch">
-                          <input type="checkbox" defaultChecked={item.checked} />
-                          <span className="toggle-slider"></span>
-                        </label>
-                      </div>
-                    ))}
-                  </div>
+              <div style={styles.securityItem}>
+                <div>
+                  <h3 style={styles.secTitle}>API Access</h3>
+                  <p style={styles.secDesc}>Manajemen API keys untuk integrasi pihak ketiga</p>
                 </div>
+                <span style={styles.comingSoonBadge}>Coming Soon</span>
               </div>
-            )}
-
-            {/* API Keys */}
-            {activeTab === 'api' && (
-              <div className="settings-panel animate-fade-in">
-                <div className="glass-card-static settings-section">
-                  <div className="section-header-row">
-                    <h3>API Keys</h3>
-                    <button className="btn btn-primary btn-sm"><Plus size={14} /> Generate Key</button>
-                  </div>
-                  <div className="api-keys-list">
-                    {apiKeys.map((key, i) => (
-                      <div key={i} className="api-key-item">
-                        <div className="api-key-info">
-                          <span className="api-key-name">{key.name}</span>
-                          <code className="api-key-value">{key.key}</code>
-                          <span className="text-xs text-tertiary">Created {key.created}</span>
-                        </div>
-                        <div className="api-key-actions">
-                          <button className="btn btn-ghost btn-sm"><Copy size={14} /> Copy</button>
-                          <button className="btn btn-danger btn-sm"><Trash2 size={14} /> Revoke</button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Team */}
-            {activeTab === 'team' && (
-              <div className="settings-panel animate-fade-in">
-                <div className="glass-card-static settings-section">
-                  <div className="section-header-row">
-                    <h3>Team Members</h3>
-                    <button className="btn btn-primary btn-sm"><Plus size={14} /> Invite</button>
-                  </div>
-                  <div className="team-list">
-                    {teamMembers.map((member, i) => (
-                      <div key={i} className="team-item">
-                        <div className="team-avatar">{member.avatar}</div>
-                        <div className="team-info">
-                          <span className="team-name">{member.name}</span>
-                          <span className="text-xs text-tertiary">{member.email}</span>
-                        </div>
-                        <span className={`badge ${member.role === 'Admin' ? 'badge-info' : 'badge-success'}`}>{member.role}</span>
-                        <button className="btn btn-ghost btn-icon btn-sm"><Trash2 size={14} /></button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
-
-      <style jsx>{`
-        .settings-layout {
-          display: grid;
-          grid-template-columns: 220px 1fr;
-          gap: var(--space-6);
-        }
-
-        .settings-tabs {
-          padding: var(--space-3);
-          display: flex;
-          flex-direction: column;
-          gap: var(--space-1);
-          position: sticky;
-          top: calc(var(--topbar-height) + var(--space-8));
-          align-self: start;
-        }
-
-        .settings-tab {
-          display: flex; align-items: center; gap: var(--space-3);
-          padding: var(--space-3) var(--space-4);
-          border: none; background: transparent;
-          color: var(--text-tertiary);
-          font-family: 'Inter', sans-serif;
-          font-size: 0.8125rem; font-weight: 500;
-          border-radius: var(--radius-md);
-          cursor: pointer;
-          transition: all var(--transition-fast);
-          text-align: left;
-        }
-
-        .settings-tab:hover { background: var(--glass-bg); color: var(--text-primary); }
-        .settings-tab.active { background: rgba(124, 58, 237, 0.12); color: var(--text-primary); }
-
-        .settings-panel {
-          display: flex; flex-direction: column; gap: var(--space-5);
-        }
-
-        .settings-section {
-          padding: var(--space-6);
-          display: flex; flex-direction: column; gap: var(--space-5);
-        }
-
-        .settings-section h3 {
-          font-size: 1rem;
-        }
-
-        .section-header-row {
-          display: flex; align-items: center; justify-content: space-between;
-        }
-
-        .settings-form-grid {
-          display: flex; flex-direction: column; gap: var(--space-4);
-        }
-
-        /* Profile */
-        .profile-avatar-section {
-          display: flex; align-items: center; gap: var(--space-4);
-        }
-
-        .profile-avatar {
-          position: relative;
-          width: 64px; height: 64px;
-          border-radius: var(--radius-full);
-          background: var(--gradient-primary);
-          display: flex; align-items: center; justify-content: center;
-          font-size: 1.25rem; font-weight: 700; color: #fff;
-        }
-
-        .profile-avatar-edit {
-          position: absolute;
-          bottom: -2px; right: -2px;
-          width: 24px; height: 24px;
-          border-radius: var(--radius-full);
-          background: var(--bg-tertiary);
-          border: 2px solid var(--bg-primary);
-          color: var(--text-secondary);
-          display: flex; align-items: center; justify-content: center;
-          cursor: pointer;
-        }
-
-        .input-password-wrapper {
-          position: relative;
-        }
-
-        .input-password-wrapper .input-field { padding-right: 40px; }
-
-        .password-toggle {
-          position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
-          background: none; border: none; color: var(--text-tertiary);
-          cursor: pointer;
-        }
-
-        /* Plan cards */
-        .plan-cards {
-          display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-3);
-        }
-
-        .plan-card {
-          padding: var(--space-4);
-          border-radius: var(--radius-lg);
-          background: var(--glass-bg);
-          border: 1px solid var(--glass-border);
-          display: flex; flex-direction: column; gap: var(--space-3);
-          transition: all var(--transition-base);
-        }
-
-        .plan-card.current {
-          border-color: var(--primary-500);
-          box-shadow: 0 0 20px rgba(124, 58, 237, 0.1);
-        }
-
-        .plan-card h4 { font-size: 0.9375rem; }
-        .plan-price { font-size: 1.125rem; font-weight: 800; }
-
-        .plan-card ul {
-          display: flex; flex-direction: column; gap: var(--space-2);
-        }
-
-        .plan-card li {
-          display: flex; align-items: center; gap: var(--space-2);
-          font-size: 0.75rem; color: var(--text-secondary);
-        }
-
-        .plan-card li :global(svg) { color: var(--success-400); }
-
-        /* Usage */
-        .usage-bars {
-          display: flex; flex-direction: column; gap: var(--space-5);
-        }
-
-        .usage-item { display: flex; flex-direction: column; gap: var(--space-2); }
-
-        .usage-header {
-          display: flex; justify-content: space-between;
-          font-size: 0.8125rem; font-weight: 500;
-        }
-
-        /* Notifications */
-        .notification-list {
-          display: flex; flex-direction: column; gap: var(--space-1);
-        }
-
-        .notification-item {
-          display: flex; align-items: center; justify-content: space-between;
-          padding: var(--space-4);
-          border-radius: var(--radius-md);
-          transition: background var(--transition-fast);
-        }
-
-        .notification-item:hover { background: var(--glass-bg); }
-
-        .notification-item > div:first-child {
-          display: flex; flex-direction: column; gap: 2px;
-        }
-
-        .notification-label { font-size: 0.875rem; font-weight: 500; }
-
-        /* API Keys */
-        .api-keys-list {
-          display: flex; flex-direction: column; gap: var(--space-3);
-        }
-
-        .api-key-item {
-          display: flex; align-items: center; justify-content: space-between;
-          padding: var(--space-4);
-          border-radius: var(--radius-md);
-          background: var(--glass-bg);
-          gap: var(--space-4);
-        }
-
-        .api-key-info {
-          display: flex; flex-direction: column; gap: 2px;
-        }
-
-        .api-key-name { font-size: 0.875rem; font-weight: 600; }
-
-        .api-key-value {
-          font-size: 0.75rem; color: var(--text-tertiary);
-          font-family: 'Courier New', monospace;
-        }
-
-        .api-key-actions { display: flex; gap: var(--space-2); }
-
-        /* Team */
-        .team-list {
-          display: flex; flex-direction: column; gap: var(--space-2);
-        }
-
-        .team-item {
-          display: flex; align-items: center; gap: var(--space-3);
-          padding: var(--space-3);
-          border-radius: var(--radius-md);
-          transition: background var(--transition-fast);
-        }
-
-        .team-item:hover { background: var(--glass-bg); }
-
-        .team-avatar {
-          width: 36px; height: 36px;
-          border-radius: var(--radius-full);
-          background: var(--gradient-primary);
-          display: flex; align-items: center; justify-content: center;
-          font-size: 0.6875rem; font-weight: 700; color: #fff;
-        }
-
-        .team-info {
-          flex: 1;
-          display: flex; flex-direction: column;
-        }
-
-        .team-name { font-size: 0.875rem; font-weight: 500; }
-
-        @media (max-width: 1024px) {
-          .plan-cards { grid-template-columns: repeat(2, 1fr); }
-        }
-
-        @media (max-width: 768px) {
-          .settings-layout { grid-template-columns: 1fr; }
-          .settings-tabs {
-            flex-direction: row;
-            overflow-x: auto;
-            position: static;
-          }
-          .settings-tab span { display: none; }
-          .plan-cards { grid-template-columns: 1fr; }
-          .api-key-item { flex-direction: column; align-items: flex-start; }
-        }
-      `}</style>
     </>
   );
 }
+
+const styles = {
+  container: { maxWidth: 640, margin: '0 auto' },
+  tabs: { display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', flexWrap: 'wrap' },
+  tab: { display: 'flex', alignItems: 'center', gap: '0.4rem', padding: '0.6rem 1.2rem', background: 'rgba(30,30,60,0.5)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 10, color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 500, transition: 'all 0.2s' },
+  tabActive: { background: 'rgba(99,102,241,0.2)', borderColor: 'rgba(99,102,241,0.4)', color: '#a5b4fc' },
+  card: { background: 'rgba(30,30,60,0.6)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 20, padding: '2rem', backdropFilter: 'blur(10px)' },
+  cardTitle: { color: '#fff', margin: '0 0 1.5rem', fontSize: '1.2rem' },
+  success: { background: 'rgba(34,197,94,0.1)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.2)', padding: '0.75rem 1rem', borderRadius: 10, marginBottom: '1rem', fontSize: '0.9rem' },
+  error: { background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)', padding: '0.75rem 1rem', borderRadius: 10, marginBottom: '1rem', fontSize: '0.9rem' },
+  field: { marginBottom: '1rem' },
+  label: { color: 'rgba(255,255,255,0.7)', fontSize: '0.85rem', fontWeight: 500, display: 'block', marginBottom: '0.4rem' },
+  input: { width: '100%', padding: '0.75rem 1rem', background: 'rgba(15,15,35,0.8)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 10, color: '#fff', fontSize: '0.9rem', boxSizing: 'border-box', transition: 'border-color 0.2s' },
+  hint: { color: 'rgba(255,255,255,0.3)', fontSize: '0.75rem', margin: '0.25rem 0 0' },
+  btn: { padding: '0.75rem 1.5rem', background: 'linear-gradient(135deg, #6366f1, #8b5cf6)', color: '#fff', border: 'none', borderRadius: 12, fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', transition: 'opacity 0.2s', marginTop: '0.5rem' },
+  comingSoon: { textAlign: 'center', padding: '3rem 1rem', color: 'rgba(255,255,255,0.4)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' },
+  comingSoonSub: { fontSize: '0.85rem', color: 'rgba(255,255,255,0.3)', margin: 0 },
+  securityItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem 0', borderBottom: '1px solid rgba(255,255,255,0.06)' },
+  secTitle: { color: '#fff', margin: 0, fontSize: '0.95rem' },
+  secDesc: { color: 'rgba(255,255,255,0.4)', margin: '0.25rem 0 0', fontSize: '0.8rem' },
+  comingSoonBadge: { background: 'rgba(99,102,241,0.15)', color: '#a5b4fc', padding: '0.2rem 0.6rem', borderRadius: 20, fontSize: '0.7rem', fontWeight: 600, whiteSpace: 'nowrap' },
+};

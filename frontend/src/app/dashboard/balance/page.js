@@ -1,11 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import TopBar from '../../../components/TopBar';
 import { topupAPI } from '@/lib/api';
-import { useAuth } from '@/context/AuthContext';
 
 export default function BalancePage() {
-  const { user } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -19,50 +18,68 @@ export default function BalancePage() {
     finally { setLoading(false); }
   }
 
-  if (loading) return <div style={styles.loading}>Loading...</div>;
+  if (loading) return (
+    <>
+      <TopBar title="Saldo & Transaksi" />
+      <div className="page-content" style={{ display: 'flex', justifyContent: 'center', paddingTop: '200px' }}>
+        <div style={styles.loading}>Loading...</div>
+      </div>
+    </>
+  );
 
   return (
-    <div style={styles.container}>
-      <h1 style={styles.title}>💰 Saldo & Transaksi</h1>
-
-      <div style={styles.balanceCard}>
-        <p style={styles.balanceLabel}>Saldo Anda</p>
-        <h2 style={styles.balanceAmount}>Rp {(data?.balance || 0).toLocaleString('id-ID')}</h2>
-      </div>
-
-      <h2 style={styles.sectionTitle}>📋 Riwayat Transaksi</h2>
-
-      {(data?.transactions || []).length === 0 ? (
-        <p style={styles.empty}>Belum ada transaksi</p>
-      ) : (
-        data.transactions.map(tx => (
-          <div key={tx.id} style={styles.txItem}>
-            <div style={styles.txLeft}>
-              <span style={styles.txIcon}>
-                {tx.type === 'topup' ? '💳' : tx.type === 'deduct' ? '📤' : tx.type === 'manual_add' ? '🎁' : '↩️'}
-              </span>
-              <div>
-                <p style={styles.txDesc}>{tx.description || tx.type}</p>
-                <p style={styles.txDate}>{new Date(tx.created_at).toLocaleString('id-ID')}</p>
-              </div>
-            </div>
-            <div style={styles.txRight}>
-              <span style={{ ...styles.txAmount, color: tx.amount >= 0 ? '#22c55e' : '#ef4444' }}>
-                {tx.amount >= 0 ? '+' : ''}Rp {Math.abs(tx.amount).toLocaleString('id-ID')}
-              </span>
-              <span style={styles.txBalance}>Saldo: Rp {tx.balance_after.toLocaleString('id-ID')}</span>
-            </div>
+    <>
+      <TopBar title="Saldo & Transaksi" />
+      <div className="page-content">
+        <div style={styles.container}>
+          <div style={styles.balanceCard}>
+            <p style={styles.balanceLabel}>Saldo Anda</p>
+            <h2 style={styles.balanceAmount}>
+              Rp {(data?.balance ?? 0).toLocaleString('id-ID')}
+            </h2>
           </div>
-        ))
-      )}
-    </div>
+
+          <h2 style={styles.sectionTitle}>📋 Riwayat Transaksi</h2>
+
+          {(data?.transactions || []).length === 0 ? (
+            <p style={styles.empty}>Belum ada transaksi</p>
+          ) : (
+            data.transactions.map(tx => (
+              <div key={tx.id} style={styles.txItem}>
+                <div style={styles.txLeft}>
+                  <span style={styles.txIcon}>
+                    {tx.type === 'topup' ? '💳'
+                      : tx.type === 'deduct' ? '📤'
+                      : tx.type === 'manual_add' ? '🎁'
+                      : '↩️'}
+                  </span>
+                  <div>
+                    <p style={styles.txDesc}>{tx.description || tx.type}</p>
+                    <p style={styles.txDate}>
+                      {new Date(tx.created_at).toLocaleString('id-ID')}
+                    </p>
+                  </div>
+                </div>
+                <div style={styles.txRight}>
+                  <span style={{ ...styles.txAmount, color: tx.amount >= 0 ? '#22c55e' : '#ef4444' }}>
+                    {tx.amount >= 0 ? '+' : ''}Rp {Math.abs(tx.amount).toLocaleString('id-ID')}
+                  </span>
+                  <span style={styles.txBalance}>
+                    Saldo: Rp {tx.balance_after.toLocaleString('id-ID')}
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </>
   );
 }
 
 const styles = {
-  container: { maxWidth: 600, margin: '0 auto', padding: '2rem 1rem' },
+  container: { maxWidth: 600, margin: '0 auto' },
   loading: { display: 'flex', justifyContent: 'center', padding: '4rem', color: 'rgba(255,255,255,0.5)' },
-  title: { color: '#fff', margin: '0 0 1.5rem', fontSize: '1.6rem' },
   balanceCard: { background: 'linear-gradient(135deg, rgba(99,102,241,0.2), rgba(139,92,246,0.2))', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 20, padding: '2rem', textAlign: 'center', marginBottom: '2rem' },
   balanceLabel: { color: 'rgba(255,255,255,0.5)', margin: '0 0 0.5rem', fontSize: '0.9rem' },
   balanceAmount: { color: '#fff', margin: 0, fontSize: '2.5rem', fontWeight: 700 },

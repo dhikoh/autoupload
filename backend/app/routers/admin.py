@@ -4,14 +4,22 @@ All endpoints guarded by require_admin or require_staff_or_admin.
 
 Superadmin: full access (settings, staff management, suspend, manual balance)
 Staff: view users, review topups, view stats, view ranking
+
+PROOF FILES:
+  GET /api/admin/proofs/{filename} — serve proof files (authenticated, staff+admin only)
+  StaticFiles mount for /proofs is REMOVED. Files only accessible via this authenticated endpoint.
 """
 
+import os
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
+from app.config import settings as app_settings
 from app.deps import get_db, require_admin, require_staff_or_admin
 from app.models import (
     User, Post, PostPlatform, ConnectedAccount,
@@ -147,8 +155,14 @@ def toggle_suspend(
     target = db.query(User).filter(User.id == user_id).first()
     if not target:
         raise HTTPException(404, "User tidak ditemukan")
+
+    # Cannot suspend superadmin accounts
     if target.role == "superadmin":
         raise HTTPException(400, "Tidak bisa suspend superadmin")
+
+    # C-SELF-SUSPEND FIX: Prevent admin from suspending their own account
+    if target.id == admin.id:
+        raise HTTPException(400, "Tidak bisa suspend akun sendiri")
 
     target.is_active = not target.is_active
     db.commit()
@@ -186,6 +200,10 @@ def delete_staff(
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
+    # Cannot delete self
+    if user_id == admin.id:
+        raise HTTPException(400, "Tidak bisa menghapus akun sendiri")
+
     target = db.query(User).filter(User.id == user_id, User.role == "staff").first()
     if not target:
         raise HTTPException(404, "Staff tidak ditemukan")
@@ -209,11 +227,29 @@ def list_topups(
 
     total = query.count()
     topups = query.order_by(
-        TopUpRequest.status.asc(),  # pending first
+        TopUpRequest.status.asc(),   # pending first
         TopUpRequest.created_at.desc(),
     ).offset(offset).limit(limit).all()
 
-    return TopUpListResponse(topups=topups, total=total)
+    # Enrich with user info for display
+    result = []
+    for t in topups:
+        user_obj = db.query(User).filter(User.id == t.user_id).first()
+        item = TopUpResponse(
+            id=t.id,
+            user_id=t.user_id,
+            user_name=user_obj.name if user_obj else "Unknown",
+            user_email=user_obj.email if user_obj else "",
+            amount=t.amount,
+            proof_file_name=t.proof_file_name,
+            status=t.status,
+            admin_note=t.admin_note,
+            created_at=t.created_at,
+            reviewed_at=t.reviewed_at,
+        )
+        result.append(item)
+
+    return TopUpListResponse(topups=result, total=total)
 
 
 @router.post("/topups/{topup_id}/review", response_model=TopUpResponse)
@@ -227,7 +263,7 @@ def review_topup(
     if not topup:
         raise HTTPException(404, "Top-up request tidak ditemukan")
     if topup.status != "pending":
-        raise HTTPException(400, "Top-up sudah direview")
+        raise HTTPException(400, "Top-up sudah direview sebelumnya")
 
     topup.reviewed_by = admin.id
     topup.reviewed_at = datetime.now(timezone.utc)
@@ -235,7 +271,7 @@ def review_topup(
 
     if req.action == "approve":
         topup.status = "approved"
-        # Add balance to user
+        # Credit balance to user
         target = db.query(User).filter(User.id == topup.user_id).first()
         if target:
             target.balance += topup.amount
@@ -245,15 +281,60 @@ def review_topup(
                 type="topup",
                 reference_id=topup.id,
                 balance_after=target.balance,
-                description=f"Top-up Rp {topup.amount:,.0f} approved",
+                description=f"Top-up Rp {topup.amount:,.0f} disetujui",
             )
             db.add(tx)
     else:
         topup.status = "rejected"
+        # Clean up proof file on rejection to prevent ghost files
+        if topup.proof_file_path:
+            try:
+                if os.path.exists(topup.proof_file_path):
+                    os.remove(topup.proof_file_path)
+            except OSError:
+                pass  # Non-critical — log if needed
 
     db.commit()
     db.refresh(topup)
-    return topup
+
+    user_obj = db.query(User).filter(User.id == topup.user_id).first()
+    return TopUpResponse(
+        id=topup.id,
+        user_id=topup.user_id,
+        user_name=user_obj.name if user_obj else "Unknown",
+        user_email=user_obj.email if user_obj else "",
+        amount=topup.amount,
+        proof_file_name=topup.proof_file_name,
+        status=topup.status,
+        admin_note=topup.admin_note,
+        created_at=topup.created_at,
+        reviewed_at=topup.reviewed_at,
+    )
+
+
+# ── Proof File Serving (authenticated staff+admin only) ─
+# C-5 FIX: Replaces StaticFiles(/proofs) — files no longer publicly accessible
+
+@router.get("/proofs/{filename}")
+def serve_proof_file(
+    filename: str,
+    admin: User = Depends(require_staff_or_admin),
+):
+    """
+    Serve a proof-of-transfer file.
+    SECURITY: Only accessible to authenticated staff/admin users.
+    Prevents path traversal via basename sanitization.
+    """
+    # Sanitize: no directory traversal
+    safe_filename = Path(filename).name
+    if not safe_filename or safe_filename != filename:
+        raise HTTPException(400, "Nama file tidak valid")
+
+    file_path = app_settings.proofs_path / safe_filename
+    if not file_path.exists():
+        raise HTTPException(404, "File tidak ditemukan")
+
+    return FileResponse(str(file_path))
 
 
 # ── App Settings (superadmin only) ─────────────────────
@@ -301,7 +382,6 @@ def get_ranking(
     db: Session = Depends(get_db),
 ):
     """Ranking user by upload count + platform channel."""
-    # Simple approach: group by user + platform
     results = (
         db.query(
             Post.user_id,
@@ -321,13 +401,11 @@ def get_ranking(
         if not user_obj:
             continue
 
-        # Get platform username from connected account
         account = db.query(ConnectedAccount).filter(
             ConnectedAccount.user_id == r.user_id,
             ConnectedAccount.platform == r.platform,
         ).first()
 
-        # Count successes
         success = db.query(func.count(PostPlatform.id)).join(Post).filter(
             Post.user_id == r.user_id,
             PostPlatform.platform == r.platform,

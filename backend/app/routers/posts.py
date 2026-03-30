@@ -1,13 +1,20 @@
 """
 AutoPost Hub — Posts Router
 POST   /api/posts            — create post + queue upload (deducts balance)
-GET    /api/posts             — list user's posts
-GET    /api/posts/{id}        — post detail with platform status
-POST   /api/posts/{id}/retry  — retry failed platforms
-DELETE /api/posts/{id}        — delete post + cleanup file
-GET    /api/posts/stats       — dashboard stats
+GET    /api/posts             — list user's posts (tenant-isolated)
+GET    /api/posts/{id}        — post detail with platform status (tenant-isolated)
+POST   /api/posts/{id}/retry  — retry failed/partial platforms (tenant-isolated)
+DELETE /api/posts/{id}        — delete post + cleanup file (tenant-isolated)
+GET    /api/posts/stats       — dashboard stats (tenant-isolated)
+
+TENANT ISOLATION:
+  All queries filter by Post.user_id == current_user.id.
+  Users can ONLY see, edit, or delete their own posts.
 """
 
+import os
+from datetime import datetime, timezone
+from pathlib import Path
 from threading import Thread
 from typing import Optional
 
@@ -16,6 +23,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.deps import get_db, get_current_user
+from app.config import settings as app_settings
 from app.models import User, Post, PostPlatform, ConnectedAccount, AppSetting, BalanceTransaction
 from app.schemas import PostCreateRequest, PostResponse, PostListResponse, DashboardStats
 from app.workers.tasks import process_post
@@ -35,22 +43,32 @@ def dashboard_stats(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Dashboard overview stats."""
+    """Dashboard overview stats — scoped to current user (tenant isolation)."""
     total = db.query(func.count(Post.id)).filter(Post.user_id == user.id).scalar() or 0
     scheduled = db.query(func.count(Post.id)).filter(
         Post.user_id == user.id, Post.scheduled_at.isnot(None), Post.status == "queued"
     ).scalar() or 0
 
-    # Success rate
-    total_pp = db.query(func.count(PostPlatform.id)).join(Post).filter(Post.user_id == user.id).scalar() or 0
-    success_pp = db.query(func.count(PostPlatform.id)).join(Post).filter(
-        Post.user_id == user.id, PostPlatform.status == "success"
-    ).scalar() or 0
+    # Success rate — only for current user's posts
+    total_pp = (
+        db.query(func.count(PostPlatform.id))
+        .join(Post)
+        .filter(Post.user_id == user.id)
+        .scalar() or 0
+    )
+    success_pp = (
+        db.query(func.count(PostPlatform.id))
+        .join(Post)
+        .filter(Post.user_id == user.id, PostPlatform.status == "success")
+        .scalar() or 0
+    )
     rate = round((success_pp / total_pp * 100), 1) if total_pp > 0 else 0.0
 
-    accounts = db.query(func.count(ConnectedAccount.id)).filter(
-        ConnectedAccount.user_id == user.id
-    ).scalar() or 0
+    accounts = (
+        db.query(func.count(ConnectedAccount.id))
+        .filter(ConnectedAccount.user_id == user.id)
+        .scalar() or 0
+    )
 
     price = _get_upload_price(db)
 
@@ -70,42 +88,79 @@ def create_post(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Create a new post and queue it for upload. Deducts balance."""
-    # Validate platforms
+    """Create a new post and queue it for upload. Deducts balance from tenant."""
+    # --- Guard: suspended users cannot post ---
+    if not user.is_active:
+        raise HTTPException(403, detail="Akun Anda disuspend. Hubungi admin.")
+
+    # --- Validate platforms ---
     valid_platforms = {"youtube", "facebook", "instagram", "tiktok", "x", "threads"}
     for p in req.platforms:
         if p not in valid_platforms:
             raise HTTPException(400, detail=f"Platform tidak valid: {p}")
 
-    # Check balance (price per file upload, not per platform)
-    price = _get_upload_price(db)
-    if user.role == "tenant" and user.balance < price:
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail=f"Saldo tidak cukup. Butuh Rp {price:,.0f}, saldo Anda Rp {user.balance:,.0f}. Silakan top-up.",
-        )
+    # --- Resolve file path from token (file_token = filename only, NOT full path) ---
+    # This prevents path traversal: we construct the path ourselves from UPLOAD_DIR
+    resolved_file_path = None
+    if req.file_token:
+        # Sanitize: strip any directory components from the token
+        safe_name = Path(req.file_token).name
+        if not safe_name or safe_name != req.file_token:
+            raise HTTPException(400, detail="File token tidak valid")
+        candidate = app_settings.upload_path / safe_name
+        if not candidate.is_file():
+            raise HTTPException(400, detail="File tidak ditemukan di server")
+        resolved_file_path = str(candidate)
+    elif req.file_path:
+        # Legacy: accept file_path for backwards compatibility but validate strictly
+        real_path = os.path.realpath(req.file_path)
+        upload_dir = os.path.realpath(str(app_settings.upload_path))
+        if not real_path.startswith(upload_dir + os.sep) and real_path != upload_dir:
+            raise HTTPException(400, detail="File path tidak valid")
+        if not os.path.isfile(real_path):
+            raise HTTPException(400, detail="File tidak ditemukan di server")
+        resolved_file_path = real_path
 
-    # Deduct balance (admin/staff exempt)
+    # --- Check balance with row-level lock to prevent race condition ---
+    price = _get_upload_price(db)
+    if user.role == "tenant":
+        # SELECT FOR UPDATE prevents concurrent requests from double-spending
+        locked_user = (
+            db.query(User)
+            .filter(User.id == user.id)
+            .with_for_update()
+            .first()
+        )
+        if locked_user.balance < price:
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail=(
+                    f"Saldo tidak cukup. Butuh Rp {price:,.0f}, "
+                    f"saldo Anda Rp {locked_user.balance:,.0f}. Silakan top-up."
+                ),
+            )
+
+    # --- Deduct balance (admin/staff exempt) ---
     cost = 0.0
     if user.role == "tenant":
         cost = price
-        user.balance -= cost
+        locked_user.balance -= cost
         tx = BalanceTransaction(
             user_id=user.id,
             amount=-cost,
             type="deduct",
-            balance_after=user.balance,
+            balance_after=locked_user.balance,
             description=f"Upload ke {', '.join(req.platforms)}",
         )
         db.add(tx)
 
-    # Create the post
+    # --- Create the post record ---
     post = Post(
         user_id=user.id,
         caption=req.caption,
         hashtags=req.hashtags,
         youtube_title=req.youtube_title,
-        file_path=req.file_path,
+        file_path=resolved_file_path,   # Server-resolved path, never from client
         file_name=req.file_name,
         file_size=req.file_size,
         file_type=req.file_type,
@@ -114,14 +169,15 @@ def create_post(
         scheduled_at=req.schedule_at,
     )
     db.add(post)
-    db.flush()
+    db.flush()  # Get post.id before commit
 
-    # Set reference_id on transaction
+    # Set reference_id on balance transaction
     if user.role == "tenant":
         tx.reference_id = post.id
 
-    # Create PostPlatform records
+    # --- Create per-platform records ---
     for platform in req.platforms:
+        # TENANT ISOLATION: only look up accounts belonging to this user
         account = db.query(ConnectedAccount).filter(
             ConnectedAccount.user_id == user.id,
             ConnectedAccount.platform == platform,
@@ -138,9 +194,16 @@ def create_post(
     db.commit()
     db.refresh(post)
 
-    # Process in background
-    thread = Thread(target=process_post, args=(post.id,), daemon=True)
-    thread.start()
+    # --- Queue processing ---
+    # For scheduled posts: only start thread if scheduled_at is in the past or not set
+    should_process_now = (
+        post.scheduled_at is None
+        or post.scheduled_at <= datetime.now(timezone.utc)
+    )
+    if should_process_now:
+        thread = Thread(target=process_post, args=(post.id,), daemon=True)
+        thread.start()
+    # If scheduled for the future, the post stays "queued" until the scheduler picks it up
 
     return post
 
@@ -154,8 +217,11 @@ def list_posts(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """List user's posts with optional filters."""
-    query = db.query(Post).filter(Post.user_id == user.id)
+    """
+    List user's posts with optional filters.
+    TENANT ISOLATION: Only returns posts belonging to the authenticated user.
+    """
+    query = db.query(Post).filter(Post.user_id == user.id)  # ← ISOLATION
 
     if status_filter:
         query = query.filter(Post.status == status_filter)
@@ -174,8 +240,14 @@ def get_post(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Get post detail with per-platform upload status."""
-    post = db.query(Post).filter(Post.id == post_id, Post.user_id == user.id).first()
+    """
+    Get post detail with per-platform upload status.
+    TENANT ISOLATION: Returns 404 if post_id doesn't belong to current user.
+    """
+    post = db.query(Post).filter(
+        Post.id == post_id,
+        Post.user_id == user.id,  # ← ISOLATION: cannot access other users' posts
+    ).first()
     if not post:
         raise HTTPException(404, detail="Post tidak ditemukan")
     return post
@@ -187,8 +259,14 @@ def retry_post(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Retry failed platform uploads for a post (no additional charge)."""
-    post = db.query(Post).filter(Post.id == post_id, Post.user_id == user.id).first()
+    """
+    Retry failed/partial platform uploads for a post (no additional charge).
+    TENANT ISOLATION: Only allows retry on own posts.
+    """
+    post = db.query(Post).filter(
+        Post.id == post_id,
+        Post.user_id == user.id,  # ← ISOLATION
+    ).first()
     if not post:
         raise HTTPException(404, detail="Post tidak ditemukan")
 
@@ -226,8 +304,14 @@ def delete_post(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Delete a post and its uploaded file. Cascade deletes PostPlatform records."""
-    post = db.query(Post).filter(Post.id == post_id, Post.user_id == user.id).first()
+    """
+    Delete a post and its uploaded file. Cascade deletes PostPlatform records.
+    TENANT ISOLATION: Users can only delete their own posts.
+    """
+    post = db.query(Post).filter(
+        Post.id == post_id,
+        Post.user_id == user.id,  # ← ISOLATION
+    ).first()
     if not post:
         raise HTTPException(404, detail="Post tidak ditemukan")
 

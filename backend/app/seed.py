@@ -1,6 +1,11 @@
 """
 AutoPost Hub — Database Seeder
 Auto-creates superadmin and default app settings on first startup.
+
+IMPORTANT: Set these environment variables before deploying:
+  SUPERADMIN_EMAIL    — email for superadmin account
+  SUPERADMIN_PASSWORD — password for superadmin account
+  SUPERADMIN_NAME     — display name (optional, default: "Super Admin")
 """
 
 import logging
@@ -10,10 +15,11 @@ from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models import User, AppSetting
 from app.auth import hash_password
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Default app settings
+# Default app settings seeded on first run
 DEFAULT_SETTINGS = {
     "upload_price": "1000",
     "bank_name": "BCA",
@@ -22,11 +28,6 @@ DEFAULT_SETTINGS = {
     "cs_whatsapp": "628123456789",
     "cs_email": "support@autoposthub.com",
 }
-
-# Superadmin credentials
-SUPERADMIN_EMAIL = "dhiko.h@gmail.com"
-SUPERADMIN_PASSWORD = "Bismillah@up2026~"
-SUPERADMIN_NAME = "Dhiko (Admin)"
 
 
 def seed_database() -> None:
@@ -42,10 +43,21 @@ def seed_database() -> None:
 
 
 def _seed_superadmin(db: Session) -> None:
-    """Create superadmin if not exists."""
-    existing = db.query(User).filter(User.email == SUPERADMIN_EMAIL).first()
+    """Create superadmin if not exists. Credentials read from env vars."""
+    email = settings.SUPERADMIN_EMAIL
+    password = settings.SUPERADMIN_PASSWORD
+    name = settings.SUPERADMIN_NAME
+
+    if not email or not password:
+        logger.warning(
+            "⚠️  SUPERADMIN_EMAIL / SUPERADMIN_PASSWORD not set in environment. "
+            "Superadmin will NOT be created. Please set these env vars."
+        )
+        return
+
+    existing = db.query(User).filter(User.email == email).first()
     if existing:
-        # Ensure role is superadmin (in case was changed)
+        # Ensure role is superadmin (in case it was accidentally changed)
         if existing.role != "superadmin":
             existing.role = "superadmin"
             db.commit()
@@ -53,19 +65,19 @@ def _seed_superadmin(db: Session) -> None:
         return
 
     admin = User(
-        email=SUPERADMIN_EMAIL,
-        name=SUPERADMIN_NAME,
-        password_hash=hash_password(SUPERADMIN_PASSWORD),
+        email=email,
+        name=name,
+        password_hash=hash_password(password),
         role="superadmin",
         balance=0.0,
     )
     db.add(admin)
     db.commit()
-    logger.info(f"✅ Superadmin created: {SUPERADMIN_EMAIL}")
+    logger.info(f"✅ Superadmin created: {email}")
 
 
 def _seed_settings(db: Session) -> None:
-    """Create default settings if not exists. Does not overwrite existing."""
+    """Create default settings if not exists. Does not overwrite existing values."""
     for key, value in DEFAULT_SETTINGS.items():
         existing = db.query(AppSetting).filter(AppSetting.key == key).first()
         if not existing:

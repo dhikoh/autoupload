@@ -89,7 +89,7 @@ export function AuthProvider({ children }) {
   const isAdminOrStaff = isAdmin || isStaff;
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, isAdmin, isStaff, isAdminOrStaff }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, checkAuth, isAdmin, isStaff, isAdminOrStaff }}>
       {children}
     </AuthContext.Provider>
   );

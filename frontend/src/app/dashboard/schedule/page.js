@@ -1,23 +1,17 @@
 'use client';
+
+import { useState, useEffect, useCallback } from 'react';
 import TopBar from '../../../components/TopBar';
 import PlatformBadge from '../../../components/PlatformBadge';
-import { ChevronLeft, ChevronRight, Plus, Edit3, Trash2, Clock } from 'lucide-react';
-import { useState } from 'react';
+import { postsAPI } from '@/lib/api';
+import { Calendar, Clock, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 
-const scheduledPosts = {
-  5: [{ time: '09:00', title: 'Marketing tips video', platforms: ['youtube', 'tiktok'] }],
-  8: [
-    { time: '10:00', title: 'Product launch carousel', platforms: ['instagram', 'facebook'] },
-    { time: '15:00', title: 'Q&A session promo', platforms: ['youtube', 'x'] },
-  ],
-  12: [{ time: '18:00', title: 'Weekend vibes reel', platforms: ['instagram', 'tiktok', 'threads'] }],
-  15: [{ time: '09:00', title: 'Monthly recap video', platforms: ['youtube', 'facebook'] }],
-  20: [{ time: '12:00', title: 'New feature announcement', platforms: ['x', 'threads', 'facebook'] }],
-  25: [{ time: '14:00', title: 'Behind the scenes', platforms: ['instagram', 'tiktok'] }],
-};
+const MONTH_NAMES = [
+  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+];
 
-const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const DAY_NAMES = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
 
 function getDaysInMonth(year, month) {
   return new Date(year, month + 1, 0).getDate();
@@ -28,230 +22,210 @@ function getFirstDayOfMonth(year, month) {
 }
 
 export default function SchedulePage() {
-  const [currentDate] = useState(new Date(2026, 2)); // March 2026
-  const [selectedDay, setSelectedDay] = useState(8);
-  const year = currentDate.getFullYear();
-  const month = currentDate.getMonth();
+  const today = new Date();
+  const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
+  const [scheduledPosts, setScheduledPosts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedDay, setSelectedDay] = useState(null);
+
+  const year = viewDate.getFullYear();
+  const month = viewDate.getMonth();
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = getFirstDayOfMonth(year, month);
-  const today = 28;
 
-  const days = [];
-  for (let i = 0; i < firstDay; i++) days.push(null);
-  for (let i = 1; i <= daysInMonth; i++) days.push(i);
+  const loadScheduled = useCallback(async () => {
+    setLoading(true);
+    try {
+      // Fetch ALL posts and filter those with scheduled status + scheduled_at set
+      const data = await postsAPI.list({ status: 'queued', limit: 100 });
+      const withSchedule = (data.posts || []).filter(p => p.scheduled_at);
+      setScheduledPosts(withSchedule);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const selectedPosts = scheduledPosts[selectedDay] || [];
+  useEffect(() => { loadScheduled(); }, [loadScheduled]);
+
+  function prevMonth() {
+    setViewDate(d => new Date(d.getFullYear(), d.getMonth() - 1, 1));
+    setSelectedDay(null);
+  }
+
+  function nextMonth() {
+    setViewDate(d => new Date(d.getFullYear(), d.getMonth() + 1, 1));
+    setSelectedDay(null);
+  }
+
+  // Build a map: "YYYY-MM-DD" -> posts[]
+  const postsByDate = {};
+  scheduledPosts.forEach(post => {
+    if (!post.scheduled_at) return;
+    const dt = new Date(post.scheduled_at);
+    const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+    if (!postsByDate[key]) postsByDate[key] = [];
+    postsByDate[key].push(post);
+  });
+
+  const selectedKey = selectedDay
+    ? `${year}-${String(month + 1).padStart(2, '0')}-${String(selectedDay).padStart(2, '0')}`
+    : null;
+  const selectedPosts = selectedKey ? (postsByDate[selectedKey] || []) : [];
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+  // Build calendar grid (padding with empty cells)
+  const cells = [];
+  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
 
   return (
     <>
-      <TopBar title="Schedule" />
+      <TopBar title="Jadwal Upload" />
       <div className="page-content">
-        <div className="schedule-layout">
-          {/* Calendar */}
-          <div className="calendar-section glass-card-static animate-fade-in">
-            <div className="calendar-header">
-              <button className="btn btn-ghost btn-icon btn-sm"><ChevronLeft size={16} /></button>
-              <h3>{monthNames[month]} {year}</h3>
-              <button className="btn btn-ghost btn-icon btn-sm"><ChevronRight size={16} /></button>
-            </div>
+        <div style={styles.container}>
+          {/* Calendar Header */}
+          <div style={styles.calHeader}>
+            <button style={styles.navBtn} onClick={prevMonth}>
+              <ChevronLeft size={18} />
+            </button>
+            <h2 style={styles.monthLabel}>
+              {MONTH_NAMES[month]} {year}
+            </h2>
+            <button style={styles.navBtn} onClick={nextMonth}>
+              <ChevronRight size={18} />
+            </button>
+          </div>
 
-            <div className="calendar-weekdays">
-              {daysOfWeek.map(d => <div key={d} className="calendar-weekday">{d}</div>)}
-            </div>
-
-            <div className="calendar-grid">
-              {days.map((day, i) => (
-                <div
-                  key={i}
-                  className={`calendar-day ${!day ? 'empty' : ''} ${day === today ? 'today' : ''} ${day === selectedDay ? 'selected' : ''} ${scheduledPosts[day] ? 'has-posts' : ''}`}
-                  onClick={() => day && setSelectedDay(day)}
-                >
-                  {day && (
-                    <>
-                      <span className="calendar-day-num">{day}</span>
-                      {scheduledPosts[day] && (
-                        <div className="calendar-day-dots">
-                          {scheduledPosts[day].map((_, j) => <span key={j} className="calendar-dot" />)}
+          {loading ? (
+            <div style={styles.loading}><Loader2 size={24} className="animate-spin" /></div>
+          ) : (
+            <>
+              {/* Calendar Grid */}
+              <div style={styles.calGrid}>
+                {/* Day headers */}
+                {DAY_NAMES.map(d => (
+                  <div key={d} style={styles.dayHeader}>{d}</div>
+                ))}
+                {/* Day cells */}
+                {cells.map((day, i) => {
+                  if (!day) return <div key={`empty-${i}`} />;
+                  const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                  const hasPosts = !!postsByDate[key];
+                  const isToday = key === todayKey;
+                  const isSelected = selectedDay === day;
+                  return (
+                    <div key={day}
+                      style={{
+                        ...styles.dayCell,
+                        ...(isToday ? styles.dayCellToday : {}),
+                        ...(isSelected ? styles.dayCellSelected : {}),
+                        cursor: 'pointer',
+                      }}
+                      onClick={() => setSelectedDay(isSelected ? null : day)}>
+                      <span style={styles.dayNum}>{day}</span>
+                      {hasPosts && (
+                        <div style={styles.dotRow}>
+                          {postsByDate[key].slice(0, 3).map((_, di) => (
+                            <div key={di} style={styles.dot} />
+                          ))}
+                          {postsByDate[key].length > 3 && (
+                            <span style={styles.dotMore}>+{postsByDate[key].length - 3}</span>
+                          )}
                         </div>
                       )}
-                    </>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Selected Day Posts List */}
+              {selectedDay && (
+                <div style={styles.selectedSection}>
+                  <h3 style={styles.selectedTitle}>
+                    <Calendar size={16} /> {selectedDay} {MONTH_NAMES[month]} {year}
+                  </h3>
+                  {selectedPosts.length === 0 ? (
+                    <p style={styles.noPosts}>Tidak ada post terjadwal hari ini.</p>
+                  ) : (
+                    selectedPosts.map(post => (
+                      <div key={post.id} style={styles.postCard}>
+                        <div style={styles.postHeader}>
+                          <div style={styles.postTime}>
+                            <Clock size={12} />
+                            {new Date(post.scheduled_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                          <span style={{
+                            ...styles.statusBadge,
+                            background: post.status === 'queued' ? 'rgba(245,158,11,0.15)' : 'rgba(34,197,94,0.15)',
+                            color: post.status === 'queued' ? '#f59e0b' : '#22c55e',
+                          }}>
+                            {post.status}
+                          </span>
+                        </div>
+                        <p style={styles.postCaption}>{post.caption || post.file_name || 'No caption'}</p>
+                        <div style={styles.platformRow}>
+                          {(post.platforms || []).map(pp => (
+                            <PlatformBadge key={pp.platform} platform={pp.platform} status={pp.status} />
+                          ))}
+                        </div>
+                      </div>
+                    ))
                   )}
                 </div>
-              ))}
-            </div>
-          </div>
+              )}
 
-          {/* Selected day detail */}
-          <div className="schedule-detail">
-            <div className="schedule-detail-header">
-              <h3>{monthNames[month]} {selectedDay}, {year}</h3>
-              <button className="btn btn-primary btn-sm"><Plus size={14} /> New Post</button>
-            </div>
-
-            {selectedPosts.length > 0 ? (
-              <div className="schedule-posts">
-                {selectedPosts.map((post, i) => (
-                  <div key={i} className="schedule-post glass-card-static animate-fade-in">
-                    <div className="schedule-post-time">
-                      <Clock size={14} />
-                      {post.time}
-                    </div>
-                    <div className="schedule-post-info">
-                      <h4>{post.title}</h4>
-                      <div className="platform-badges">
-                        {post.platforms.map(p => <PlatformBadge key={p} platform={p} size="sm" />)}
-                      </div>
-                    </div>
-                    <div className="schedule-post-actions">
-                      <button className="btn btn-ghost btn-icon btn-sm"><Edit3 size={14} /></button>
-                      <button className="btn btn-ghost btn-icon btn-sm"><Trash2 size={14} /></button>
-                    </div>
-                  </div>
-                ))}
+              {/* Summary */}
+              <div style={styles.summary}>
+                <p style={styles.summaryText}>
+                  📅 Total post terjadwal bulan ini:{' '}
+                  <strong style={{ color: '#a5b4fc' }}>
+                    {Object.entries(postsByDate).filter(([k]) =>
+                      k.startsWith(`${year}-${String(month + 1).padStart(2, '0')}`)
+                    ).reduce((sum, [, posts]) => sum + posts.length, 0)}
+                  </strong>
+                  {' '}post
+                </p>
+                {scheduledPosts.length === 0 && (
+                  <p style={styles.emptyHint}>
+                    💡 Belum ada jadwal. Buat post baru dan pilih waktu "Scheduled" saat upload.
+                  </p>
+                )}
               </div>
-            ) : (
-              <div className="schedule-empty glass-card-static">
-                <Clock size={32} />
-                <p>No posts scheduled for this day</p>
-                <button className="btn btn-outline btn-sm"><Plus size={14} /> Schedule Post</button>
-              </div>
-            )}
-          </div>
+            </>
+          )}
         </div>
       </div>
-
-      <style jsx>{`
-        .schedule-layout {
-          display: grid;
-          grid-template-columns: 1fr 380px;
-          gap: var(--space-6);
-        }
-
-        /* Calendar */
-        .calendar-section { padding: var(--space-5); }
-
-        .calendar-header {
-          display: flex; align-items: center; justify-content: space-between;
-          margin-bottom: var(--space-5);
-        }
-
-        .calendar-header h3 { font-size: 1.125rem; }
-
-        .calendar-weekdays {
-          display: grid; grid-template-columns: repeat(7, 1fr);
-          margin-bottom: var(--space-2);
-        }
-
-        .calendar-weekday {
-          text-align: center; font-size: 0.75rem; font-weight: 600;
-          color: var(--text-tertiary); padding: var(--space-2);
-        }
-
-        .calendar-grid {
-          display: grid; grid-template-columns: repeat(7, 1fr);
-          gap: 2px;
-        }
-
-        .calendar-day {
-          aspect-ratio: 1;
-          display: flex; flex-direction: column;
-          align-items: center; justify-content: center;
-          border-radius: var(--radius-md);
-          cursor: pointer;
-          transition: all var(--transition-fast);
-          position: relative;
-          gap: 4px;
-        }
-
-        .calendar-day.empty { cursor: default; }
-
-        .calendar-day:not(.empty):hover {
-          background: var(--glass-bg);
-        }
-
-        .calendar-day.today .calendar-day-num {
-          background: var(--gradient-primary);
-          width: 28px; height: 28px;
-          border-radius: var(--radius-full);
-          display: flex; align-items: center; justify-content: center;
-          color: #fff; font-weight: 700;
-        }
-
-        .calendar-day.selected {
-          background: rgba(124, 58, 237, 0.1);
-          border: 1px solid rgba(124, 58, 237, 0.3);
-        }
-
-        .calendar-day-num {
-          font-size: 0.8125rem; font-weight: 500;
-        }
-
-        .calendar-day-dots {
-          display: flex; gap: 2px;
-        }
-
-        .calendar-dot {
-          width: 5px; height: 5px;
-          border-radius: 50%;
-          background: var(--primary-400);
-        }
-
-        /* Detail panel */
-        .schedule-detail {
-          display: flex; flex-direction: column; gap: var(--space-4);
-        }
-
-        .schedule-detail-header {
-          display: flex; align-items: center; justify-content: space-between;
-        }
-
-        .schedule-detail-header h3 { font-size: 1rem; }
-
-        .schedule-posts {
-          display: flex; flex-direction: column; gap: var(--space-3);
-        }
-
-        .schedule-post {
-          padding: var(--space-4);
-          display: flex; align-items: flex-start; gap: var(--space-3);
-        }
-
-        .schedule-post-time {
-          display: flex; align-items: center; gap: var(--space-1);
-          font-size: 0.8125rem; font-weight: 600;
-          color: var(--primary-400);
-          min-width: 60px;
-        }
-
-        .schedule-post-info {
-          flex: 1;
-          display: flex; flex-direction: column; gap: var(--space-2);
-        }
-
-        .schedule-post-info h4 { font-size: 0.875rem; }
-
-        .platform-badges {
-          display: flex; gap: var(--space-1); flex-wrap: wrap;
-        }
-
-        .schedule-post-actions {
-          display: flex; gap: var(--space-1);
-        }
-
-        .schedule-empty {
-          padding: var(--space-10);
-          display: flex; flex-direction: column;
-          align-items: center; gap: var(--space-3);
-          color: var(--text-tertiary);
-          text-align: center;
-        }
-
-        .schedule-empty p { font-size: 0.875rem; }
-
-        @media (max-width: 1024px) {
-          .schedule-layout { grid-template-columns: 1fr; }
-        }
-      `}</style>
     </>
   );
 }
+
+const styles = {
+  container: { maxWidth: 640, margin: '0 auto' },
+  calHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' },
+  monthLabel: { color: '#fff', margin: 0, fontSize: '1.2rem', fontWeight: 600 },
+  navBtn: { background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, color: '#fff', cursor: 'pointer', padding: '0.4rem', display: 'flex', alignItems: 'center', transition: 'all 0.2s' },
+  loading: { display: 'flex', justifyContent: 'center', padding: '3rem', color: 'rgba(255,255,255,0.5)' },
+  calGrid: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.25rem', marginBottom: '1.5rem' },
+  dayHeader: { textAlign: 'center', padding: '0.5rem', color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem', fontWeight: 600 },
+  dayCell: { background: 'rgba(30,30,60,0.4)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: '0.5rem', minHeight: 56, display: 'flex', flexDirection: 'column', alignItems: 'center', transition: 'all 0.15s' },
+  dayCellToday: { borderColor: 'rgba(99,102,241,0.5)', background: 'rgba(99,102,241,0.1)' },
+  dayCellSelected: { borderColor: '#6366f1', background: 'rgba(99,102,241,0.2)' },
+  dayNum: { color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', fontWeight: 500 },
+  dotRow: { display: 'flex', gap: 2, marginTop: 4, flexWrap: 'wrap', justifyContent: 'center' },
+  dot: { width: 5, height: 5, borderRadius: '50%', background: '#6366f1' },
+  dotMore: { fontSize: '0.6rem', color: '#a5b4fc' },
+  selectedSection: { background: 'rgba(30,30,60,0.6)', border: '1px solid rgba(99,102,241,0.3)', borderRadius: 16, padding: '1.25rem', marginBottom: '1.5rem' },
+  selectedTitle: { color: '#fff', margin: '0 0 1rem', fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' },
+  noPosts: { color: 'rgba(255,255,255,0.4)', textAlign: 'center', padding: '1rem' },
+  postCard: { background: 'rgba(15,15,35,0.6)', borderRadius: 12, padding: '0.75rem 1rem', marginBottom: '0.5rem' },
+  postHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' },
+  postTime: { color: '#a5b4fc', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.25rem' },
+  statusBadge: { padding: '0.15rem 0.5rem', borderRadius: 20, fontSize: '0.7rem', fontWeight: 600 },
+  postCaption: { color: 'rgba(255,255,255,0.7)', margin: '0 0 0.5rem', fontSize: '0.85rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  platformRow: { display: 'flex', gap: '0.35rem', flexWrap: 'wrap' },
+  summary: { background: 'rgba(30,30,60,0.4)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: '1rem 1.25rem' },
+  summaryText: { color: 'rgba(255,255,255,0.6)', margin: 0, fontSize: '0.9rem' },
+  emptyHint: { color: 'rgba(255,255,255,0.4)', margin: '0.5rem 0 0', fontSize: '0.84rem' },
+};

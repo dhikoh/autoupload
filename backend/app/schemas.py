@@ -70,8 +70,10 @@ class PostCreateRequest(BaseModel):
     youtube_title: Optional[str] = None
     platforms: list[str] = Field(..., min_length=1)
     schedule_at: Optional[datetime] = None
-    # File metadata from /api/upload response
-    file_path: Optional[str] = None
+    # NEW: file_token = safe filename returned by /api/upload (preferred)
+    # LEGACY: file_path still accepted for backwards compatibility
+    file_token: Optional[str] = None    # Filename only, no path. Server reconstructs full path.
+    file_path: Optional[str] = None     # Deprecated: full path (validated server-side)
     file_name: Optional[str] = None
     file_size: Optional[float] = None
     file_type: Optional[str] = None
@@ -132,6 +134,8 @@ class TopUpCreateRequest(BaseModel):
 class TopUpResponse(BaseModel):
     id: str
     user_id: str
+    user_name: Optional[str] = None      # Populated by admin endpoint
+    user_email: Optional[str] = None     # Populated by admin endpoint
     amount: float
     proof_file_name: Optional[str]
     status: str

@@ -11,14 +11,13 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, status
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 
 from app.config import settings
 from app.deps import get_db, get_current_user
 from app.models import User, TopUpRequest, BalanceTransaction, AppSetting
 from app.schemas import (
     TopUpResponse, TopUpListResponse,
-    BalanceResponse, BalanceTransactionResponse,
+    BalanceResponse,
     PublicSettingsResponse,
 )
 
