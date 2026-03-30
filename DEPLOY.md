@@ -1,127 +1,137 @@
-# 🚀 AutoPost Hub — Tutorial Deploy ke Coolify
+# 🚀 AutoPost Hub — Panduan Deploy ke Coolify
 
-## Arsitektur
+## Arsitektur Production
 
 ```
-up.modula.click        →  Frontend (Next.js)     :3000
-api.up.modula.click    →  Backend  (FastAPI)      :8000
-                          Redis (internal)        :6379
+up.modula.click        →  Frontend (Next.js)    :3000
+api.up.modula.click    →  Backend  (FastAPI)     :8000
+                          Redis    (internal)    :6379
 ```
+
+GitHub Repo: `https://github.com/dhikoh/autoupload` (branch: `master`)
 
 ---
 
 ## Langkah 1: Setup DNS
 
-Buka panel DNS domain kamu (Cloudflare / Niagahoster / dll), tambahkan:
+Buka panel DNS domain (Cloudflare/Niagahoster/dll), tambahkan A records:
 
-| Type | Name | Value | Proxy |
-|------|------|-------|-------|
-| A | `up` | `IP_VPS_KAMU` | ✅ ON |
-| A | `api.up` | `IP_VPS_KAMU` | ✅ ON |
+| Type | Name    | Value        | Proxy |
+|------|---------|--------------|-------|
+| A    | `up`    | `IP_VPS_KAMU` | ✅ ON  |
+| A    | `api.up` | `IP_VPS_KAMU` | ✅ ON  |
 
-> ⏳ Tunggu 2–5 menit sampai DNS propagate.
+> ⏳ Tunggu 2–5 menit propagasi DNS sebelum lanjut.
 
 ---
 
-## Langkah 2: Deploy Backend di Coolify
+## Langkah 2: Generate Secret Key
 
-### 2.1 — Buat Project Baru
-1. Login ke Coolify → **Projects** → **+ New Project**
+Di terminal (VPS atau lokal):
+```bash
+openssl rand -hex 32
+# Atau:
+python3 -c "import secrets; print(secrets.token_hex(64))"
+```
+Simpan output — ini akan dipakai sebagai `SECRET_KEY`.
+
+---
+
+## Langkah 3: Deploy Backend di Coolify
+
+### 3.1 — Buat Project Baru
+1. Login Coolify → **Projects** → **+ New Project**
 2. Nama: `AutoPost Hub`
 
-### 2.2 — Tambah Resource: Backend
-1. Di project → **+ New Resource** → **Docker**
-2. Pilih **Dockerfile** (bukan Docker Compose)
-3. Connect ke repo GitHub: `https://github.com/dhikoh/autoupload.git`
-4. Settings:
-   - **Build Pack**: Dockerfile
+### 3.2 — Tambah Resource Backend
+1. Project → **+ New Resource** → **Docker** → **Dockerfile**
+2. Connect GitHub repo: `https://github.com/dhikoh/autoupload`
+3. Settings:
    - **Dockerfile Location**: `/backend/Dockerfile`
    - **Base Directory**: `/backend`
-   - **Port Exposed**: `8000`
+   - **Port**: `8000`
    - **Domain**: `api.up.modula.click`
 
-### 2.3 — Set Environment Variables Backend
-Di tab **Environment Variables**, tambahkan:
+### 3.3 — Set Environment Variables Backend
+
+Di tab **Environment Variables**, tambahkan semua ini:
 
 ```env
-SECRET_KEY=GANTI_DENGAN_STRING_RANDOM_64_KARAKTER
-DATABASE_URL=sqlite:///./autopost.db
-UPLOAD_DIR=./uploads
+SECRET_KEY=<output dari step 2 — string 64 karakter>
+
+SUPERADMIN_EMAIL=admin@yourdomain.com
+SUPERADMIN_PASSWORD=GantiPasswordKuat@2024!
+SUPERADMIN_NAME=Super Admin
+
+DATABASE_URL=sqlite:////app/data/autopost.db
+UPLOAD_DIR=/app/uploads
+MAX_UPLOAD_SIZE_MB=500
+
+FRONTEND_URL=https://up.modula.click
+ACCESS_TOKEN_EXPIRE_DAYS=7
+
 REDIS_URL=redis://redis:6379/0
 USE_CELERY=false
-FRONTEND_URL=https://up.modula.click
 ```
 
-> 💡 Generate SECRET_KEY: buka terminal → `openssl rand -hex 32`
+> ⚠️ **PENTING**: `DATABASE_URL` pakai 4 slash (`sqlite:////app/data/...`) untuk path absolut di Linux.
 
-### 2.4 — Tambah Persistent Storage
-Di tab **Storages**, tambahkan:
+### 3.4 — Tambah Persistent Storage
 
-| Source Path | Destination Path | Keterangan |
-|-------------|-----------------|------------|
-| (auto) | `/app/uploads` | File upload |
-| (auto) | `/app/autopost.db` | SQLite database |
+Di tab **Storages**:
 
-### 2.5 — Deploy
-Klik **Deploy** → tunggu sampai ✅ hijau.
+| Source (auto-generate) | Mount Path      | Keterangan          |
+|------------------------|-----------------|---------------------|
+| (auto)                 | `/app/uploads`  | File video/gambar   |
+| (auto)                 | `/app/data`     | SQLite database     |
 
-### 2.6 — Test
-Buka: `https://api.up.modula.click/api/health`
-Harus muncul: `{"status":"ok","service":"autopost-hub"}`
+> 🔑 **KRITIS**: Tanpa persistent storage, database akan HILANG setiap redeploy!
 
----
-
-## Langkah 3: Deploy Redis di Coolify
-
-1. Di project → **+ New Resource** → **Database**
-2. Pilih **Redis**
-3. Settings:
-   - **Version**: `7` (alpine)
-   - Jangan ekspos port ke public
-4. Catat **Internal URL** Redis (format: `redis://redis-xxxxx:6379`)
-5. Update env backend `REDIS_URL` dengan URL ini
-
-> ⚠️ Jika tidak pakai Celery (USE_CELERY=false), Redis opsional. Boleh skip langkah ini.
+### 3.5 — Deploy & Verifikasi
+1. Klik **Deploy** → tunggu build selesai (3–5 menit)
+2. Test: `https://api.up.modula.click/api/health`
+3. Expected response:
+```json
+{"status": "ok", "service": "autopost-hub", "version": "2.0.0", "scheduler": "running"}
+```
 
 ---
 
 ## Langkah 4: Deploy Frontend di Coolify
 
-### 4.1 — Tambah Resource: Frontend
-1. Di project → **+ New Resource** → **Docker**
-2. Pilih **Dockerfile**
-3. Connect ke repo yang sama: `https://github.com/dhikoh/autoupload.git`
-4. Settings:
-   - **Build Pack**: Dockerfile
+### 4.1 — Tambah Resource Frontend  
+1. Project → **+ New Resource** → **Docker** → **Dockerfile**
+2. Connect GitHub repo yang sama
+3. Settings:
    - **Dockerfile Location**: `/frontend/Dockerfile`
    - **Base Directory**: `/frontend`
-   - **Port Exposed**: `3000`
+   - **Port**: `3000`
    - **Domain**: `up.modula.click`
 
-### 4.2 — Set Build Arguments
-Di tab **Environment Variables**, tambahkan sebagai **Build Variable** (bukan runtime):
+### 4.2 — Set Build Argument
+
+Di tab **Environment Variables** → pilih **Build Variable** (penting!):
 
 ```
 NEXT_PUBLIC_API_URL=https://api.up.modula.click
 ```
 
-> ⚠️ **PENTING**: Ini HARUS jadi **Build Argument**, bukan runtime env. Next.js bake `NEXT_PUBLIC_*` saat build.
-> Di Coolify, tandai sebagai "Build Variable" atau masukkan di **Build Args**.
+> ⚠️ Ini **HARUS** Build Variable, bukan Runtime. Next.js bake `NEXT_PUBLIC_*` saat build time.
 
-### 4.3 — Deploy
-Klik **Deploy** → tunggu ✅.
-
-### 4.4 — Test
-Buka: `https://up.modula.click`
-Harus muncul halaman landing AutoPost Hub.
+### 4.3 — Deploy & Verifikasi
+1. Klik **Deploy** → tunggu build (5–8 menit, ada npm build)
+2. Buka: `https://up.modula.click`
+3. Harus muncul halaman login AutoPost Hub
 
 ---
 
-## Langkah 5: Aktifkan SSL (HTTPS)
+## Langkah 5: SSL/HTTPS
 
-Coolify biasanya auto-generate SSL via Let's Encrypt. Pastikan:
-1. Backend domain `api.up.modula.click` → **SSL**: ✅ Enabled
-2. Frontend domain `up.modula.click` → **SSL**: ✅ Enabled
+Coolify auto-generate SSL via Let's Encrypt. Pastikan:
+- `api.up.modula.click` → SSL ✅ Enabled  
+- `up.modula.click` → SSL ✅ Enabled
+
+Jika SSL gagal: pastikan port 80 & 443 terbuka di firewall VPS.
 
 ---
 
@@ -129,36 +139,79 @@ Coolify biasanya auto-generate SSL via Let's Encrypt. Pastikan:
 
 | Test | URL | Expected |
 |------|-----|----------|
-| Health | `https://api.up.modula.click/api/health` | `{"status":"ok"}` |
-| Landing | `https://up.modula.click` | Landing page |
-| Register | `https://up.modula.click/register` | Form → berhasil |
-| Login | `https://up.modula.click/login` | Form → redirect dashboard |
-| Dashboard | `https://up.modula.click/dashboard` | Stats 0, empty state |
+| API Health | `https://api.up.modula.click/api/health` | `{"status":"ok","scheduler":"running"}` |
+| API Docs | `https://api.up.modula.click/docs` | Swagger UI |
+| Landing | `https://up.modula.click` | Login page |
+| Register | `https://up.modula.click/register` | Form berhasil |
+| Login Admin | Email + password dari env vars | Redirect ke `/admin` |
+| Dashboard | `https://up.modula.click/dashboard` | Stats, empty state |
+
+### Test Flow Lengkap:
+1. Login sebagai admin → `/admin`
+2. Buka Settings → set harga upload, bank info
+3. Register akun tenant baru → login
+4. Buka Topup → upload bukti transfer
+5. Login admin → review → approve topup
+6. Login tenant → saldo bertambah
+7. Buat post → upload file → pilih platform → submit
+
+---
+
+## Auto-Deploy (Recommended)
+
+Aktifkan agar setiap `git push` ke `master` auto-deploy:
+1. Backend resource → Settings → **Automatic Deploy**: ✅ ON
+2. Frontend resource → Settings → **Automatic Deploy**: ✅ ON
+
+Atau gunakan Coolify Webhook → tambah ke GitHub repo Settings → Webhooks.
 
 ---
 
 ## Troubleshooting
 
-### CORS Error
-Pastikan env backend: `FRONTEND_URL=https://up.modula.click` (bukan http, bukan trailing slash).
+### CORS Error di Browser
+```
+Pastikan: FRONTEND_URL=https://up.modula.click (tanpa trailing slash, pakai https)
+```
 
-### Login Gagal / 401
-Cek browser console → Network tab → pastikan request ke `https://api.up.modula.click` (bukan localhost).
+### Login Selalu 401
+```
+Cek: Network tab browser → request harus ke https://api.up.modula.click (bukan localhost)
+Pastikan NEXT_PUBLIC_API_URL di-set sebagai Build Variable (bukan runtime env)
+```
 
-### File Upload Gagal
-Pastikan persistent storage `/app/uploads` sudah di-mount di Coolify.
+### File Upload Gagal / 500
+```
+Pastikan persistent storage /app/uploads sudah di-mount di Coolify
+Cek log backend: apakah ada "Permission denied" error
+```
 
 ### Database Hilang Setelah Redeploy
-Pastikan `/app/autopost.db` di-mount ke persistent storage.
+```
+Pastikan persistent storage /app/data sudah di-mount
+DATABASE_URL=sqlite:////app/data/autopost.db (4 slash!)
+```
+
+### Superadmin Tidak Bisa Login
+```
+Cek log backend saat startup — harus ada: "✅ Superadmin created: email@..."
+Jika tidak muncul, cek SUPERADMIN_EMAIL dan SUPERADMIN_PASSWORD sudah di-set
+```
+
+### Scheduler Tidak Jalan
+```
+GET /api/health → "scheduler" harus "running"
+Jika "stopped", cek log untuk APScheduler error
+```
 
 ---
 
-## Update / Redeploy
+## Redeploy Setelah Update
 
-Setiap kali push ke GitHub:
-1. Buka Coolify → project → resource
-2. Klik **Redeploy** (atau aktifkan auto-deploy via webhook)
+```bash
+# 1. Push perubahan ke GitHub
+git push origin master
 
-Atau aktifkan **Auto Deploy**:
-- Resource → Settings → **Automatic Deploy**: ✅ ON
-- Coolify akan auto-redeploy setiap ada push ke branch `master`
+# 2. Di Coolify — klik Redeploy pada resource yang berubah
+# Atau biarkan auto-deploy berjalan (jika sudah diaktifkan)
+```
