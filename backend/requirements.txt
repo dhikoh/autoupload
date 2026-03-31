@@ -11,3 +11,5 @@ pydantic-settings==2.7.1
 httpx==0.28.1
 # PostgreSQL driver (required if DATABASE_URL starts with postgresql://)
 psycopg2-binary==2.9.10
+# Rate limiting
+slowapi==0.1.9

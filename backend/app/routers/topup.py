@@ -9,7 +9,7 @@ GET  /api/settings/public — get public settings (price, bank, CS)
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form, Query, status
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -20,6 +20,7 @@ from app.schemas import (
     BalanceResponse,
     PublicSettingsResponse,
 )
+from app.middleware.rate_limit import limiter
 
 router = APIRouter(tags=["TopUp & Balance"])
 
@@ -27,7 +28,9 @@ PROOF_ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "application/pdf
 
 
 @router.post("/api/topup", response_model=TopUpResponse, status_code=201)
+@limiter.limit("5/hour")
 async def create_topup(
+    request: Request,
     amount: float = Form(...),
     proof: UploadFile = File(...),
     user: User = Depends(get_current_user),

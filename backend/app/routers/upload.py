@@ -7,16 +7,18 @@ SECURITY:
   - Returns file_token (filename only) instead of full server path
   - posts.py reconstructs the real path from token + UPLOAD_DIR
   - Max file size enforced (default 500MB)
+  - Rate limited: 20 uploads/hour per IP
 """
 
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, status
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, status
 
 from app.config import settings
 from app.deps import get_current_user
 from app.models import User
+from app.middleware.rate_limit import limiter
 
 router = APIRouter(prefix="/api/upload", tags=["Upload"])
 
@@ -62,7 +64,9 @@ def _validate_magic_bytes(content_type: str, header: bytes) -> bool:
 
 
 @router.post("")
+@limiter.limit("20/hour")
 async def upload_file(
+    request: Request,
     file: UploadFile = File(...),
     user: User = Depends(get_current_user),
 ):

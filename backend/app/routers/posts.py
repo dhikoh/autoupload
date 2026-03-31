@@ -18,7 +18,7 @@ from pathlib import Path
 from threading import Thread
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
@@ -28,6 +28,7 @@ from app.models import User, Post, PostPlatform, ConnectedAccount, AppSetting, B
 from app.schemas import PostCreateRequest, PostResponse, PostListResponse, DashboardStats
 from app.workers.tasks import process_post
 from app.workers.cleanup import force_cleanup
+from app.middleware.rate_limit import limiter
 
 router = APIRouter(prefix="/api/posts", tags=["Posts"])
 
@@ -83,7 +84,9 @@ def dashboard_stats(
 
 
 @router.post("", response_model=PostResponse, status_code=201)
+@limiter.limit("30/hour")
 def create_post(
+    request: Request,
     req: PostCreateRequest,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
