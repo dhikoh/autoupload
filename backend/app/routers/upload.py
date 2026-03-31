@@ -64,7 +64,7 @@ def _validate_magic_bytes(content_type: str, header: bytes) -> bool:
 
 
 @router.post("")
-@limiter.limit("20/hour")
+@limiter.limit("20 per 10 minutes")
 async def upload_file(
     request: Request,
     file: UploadFile = File(...),

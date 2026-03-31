@@ -28,7 +28,7 @@ PROOF_ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp", "application/pdf
 
 
 @router.post("/api/topup", response_model=TopUpResponse, status_code=201)
-@limiter.limit("5/hour")
+@limiter.limit("5 per 10 minutes")
 async def create_topup(
     request: Request,
     amount: float = Form(...),

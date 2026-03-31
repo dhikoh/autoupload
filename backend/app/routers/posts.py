@@ -84,7 +84,7 @@ def dashboard_stats(
 
 
 @router.post("", response_model=PostResponse, status_code=201)
-@limiter.limit("30/hour")
+@limiter.limit("30 per 10 minutes")
 def create_post(
     request: Request,
     req: PostCreateRequest,

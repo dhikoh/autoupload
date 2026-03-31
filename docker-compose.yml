@@ -115,6 +115,23 @@ services:
       retries: 3
       start_period: 20s
 
+  # ── Nginx Reverse Proxy (rate limiting + SSL termination) ─
+  # NOTE: Untuk Coolify, Nginx sudah built-in via Traefik.
+  #       Aktifkan nginx ini HANYA jika deploy manual tanpa Coolify.
+  #
+  # nginx:
+  #   image: nginx:1.25-alpine
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx/nginx.conf:/etc/nginx/conf.d/autoposthub.conf:ro
+  #     - /etc/letsencrypt:/etc/letsencrypt:ro  # SSL certs from Certbot
+  #   depends_on:
+  #     - backend
+  #     - frontend
+  #   restart: unless-stopped
+
 volumes:
   backend-uploads:
   backend-db:        # SQLite data (hapus jika pakai PostgreSQL)

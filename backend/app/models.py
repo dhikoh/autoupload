@@ -51,10 +51,16 @@ class User(Base):
     password_hash = Column(String(128), nullable=False)
     role = Column(String(20), default="tenant")       # superadmin / staff / tenant
     balance = Column(Float, default=0.0)               # saldo in Rupiah
-    is_active = Column(Boolean, default=True)           # admin can suspend
+    is_active = Column(Boolean, default=True)          # admin can suspend
+
+    # Email verification
+    is_email_verified = Column(Boolean, default=False)
+    email_verification_token = Column(String(64), nullable=True, index=True)
+    email_verification_expires = Column(DateTime, nullable=True)
+
     created_at = Column(DateTime, default=_now)
 
-    # Relationships — cascade delete to prevent orphans
+    # Relationships
     accounts = relationship("ConnectedAccount", back_populates="user", cascade="all, delete-orphan")
     posts = relationship("Post", back_populates="user", cascade="all, delete-orphan")
     topup_requests = relationship("TopUpRequest", back_populates="user", cascade="all, delete-orphan",
@@ -185,3 +191,37 @@ class PostPlatform(Base):
     uploaded_at = Column(DateTime, nullable=True)
 
     post = relationship("Post", back_populates="platforms")
+
+
+# ── Blocked IP ─────────────────────────────────────────
+
+class BlockedIP(Base):
+    __tablename__ = "blocked_ips"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    ip_address = Column(String(45), nullable=False, unique=True, index=True)  # Supports IPv6
+    reason = Column(Text, nullable=True)
+    is_auto_blocked = Column(Boolean, default=False)  # True = auto-blocked by system
+    blocked_at = Column(DateTime, default=_now)
+    expires_at = Column(DateTime, nullable=True)       # NULL = permanent block
+    blocked_by = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+    blocker = relationship("User", foreign_keys=[blocked_by])
+
+
+# ── Security Event (audit log for suspicious activity) ─
+
+class SecurityEvent(Base):
+    __tablename__ = "security_events"
+
+    id = Column(String, primary_key=True, default=_uuid)
+    event_type = Column(String(50), nullable=False)
+    # Types: login_lockout, auto_block_ip, manual_block_ip, rate_limit_exceeded,
+    #        register_spam_detected, topup_spam_detected
+
+    ip_address = Column(String(45), nullable=True)
+    email = Column(String(320), nullable=True)
+    details = Column(Text, nullable=True)    # JSON or plain text
+    admin_notified = Column(Boolean, default=False)
+
+    created_at = Column(DateTime, default=_now)

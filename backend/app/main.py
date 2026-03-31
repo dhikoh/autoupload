@@ -35,9 +35,12 @@ from slowapi.middleware import SlowAPIMiddleware
 from app.config import settings
 from app.database import engine, Base, SessionLocal
 from app.routers import auth, upload, posts, accounts, admin, topup
+from app.routers import security as security_router
 from app.seed import seed_database
+from app.migrations import run_migrations
 from app.workers.cleanup import cleanup_orphan_files, cleanup_stale_partial_posts
 from app.middleware.rate_limit import limiter
+from app.middleware.ip_block import IPBlocklistMiddleware, refresh_ip_cache
 
 # Configure logging
 logging.basicConfig(
@@ -146,13 +149,17 @@ async def lifespan(app: FastAPI):
     """Create database tables on startup, seed default data, start scheduler."""
     global scheduler
 
-    # Create all tables
+    # Create all tables + run schema migrations
     Base.metadata.create_all(bind=engine)
+    run_migrations(engine)
     settings.upload_path   # Creates uploads dir
     settings.proofs_path   # Creates proofs subdir
 
     # Seed superadmin and default settings
     seed_database()
+
+    # Load blocked IPs into in-memory cache
+    refresh_ip_cache()
 
     # Only start scheduler on the primary worker
     if _is_primary_worker():
@@ -207,10 +214,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Rate limiting (slowapi) — must be registered before CORS middleware
+# Rate limiting (slowapi)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
+
+# IP Blocklist — checked before rate limiting (outer middleware = last applied)
+app.add_middleware(IPBlocklistMiddleware)
 
 # CORS — explicit origins for production safety
 app.add_middleware(
@@ -232,6 +242,7 @@ app.include_router(posts.router)
 app.include_router(accounts.router)
 app.include_router(admin.router)
 app.include_router(topup.router)
+app.include_router(security_router.router)
 
 
 @app.get("/api/health")

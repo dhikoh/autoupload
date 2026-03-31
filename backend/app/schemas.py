@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 class RegisterRequest(BaseModel):
     email: str = Field(..., max_length=320)
     name: str = Field(..., min_length=1, max_length=100)
-    password: str = Field(..., min_length=6, max_length=128)
+    password: str = Field(..., min_length=8, max_length=128)  # min 8 chars
 
 
 class LoginRequest(BaseModel):
@@ -26,6 +26,7 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     role: str = "tenant"
+    email_verification_required: bool = False  # True = user must verify email before full access
 
 
 class UserResponse(BaseModel):
@@ -35,6 +36,7 @@ class UserResponse(BaseModel):
     role: str
     balance: float
     is_active: bool
+    is_email_verified: bool = False
     created_at: datetime
 
     model_config = {"from_attributes": True}
