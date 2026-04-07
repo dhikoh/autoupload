@@ -17,9 +17,9 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (!loading) {
       const isAuthPage = pathname === '/login' || pathname === '/register';
+      const isPublicPage = pathname === '/' || isAuthPage || pathname === '/verify-email';
       const isDashboard = pathname.startsWith('/dashboard');
       const isAdmin = pathname.startsWith('/admin');
-      const isPublic = pathname === '/' || isAuthPage;
 
       if (!user && (isDashboard || isAdmin)) {
         router.replace('/login');
@@ -69,12 +69,20 @@ export function AuthProvider({ children }) {
 
   const register = useCallback(async (email, name, password) => {
     const data = await authAPI.register(email, name, password);
+
+    // If server requires email verification, don't auto-login
+    // Return the raw data so the register page can show the "check email" state
+    if (data.email_verification_required) {
+      return data;
+    }
+
+    // Normal flow — set token, fetch user, redirect
     setToken(data.access_token);
     setRole(data.role);
     const userData = await authAPI.me();
     setUser(userData);
     router.replace('/dashboard');
-    return userData;
+    return data; // return raw data (not userData) so register page can check flag
   }, [router]);
 
   const logout = useCallback(() => {

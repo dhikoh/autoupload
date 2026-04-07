@@ -19,6 +19,7 @@ export default function AdminLayout({ children }) {
     ...(isAdmin ? [
       { href: '/admin/settings', label: 'Settings', icon: '⚙️' },
       { href: '/admin/staff', label: 'Staff', icon: '🛡️' },
+      { href: '/admin/security', label: 'Security', icon: '🔐' },
     ] : []),
   ];
 

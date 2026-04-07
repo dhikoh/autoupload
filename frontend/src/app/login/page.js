@@ -1,8 +1,9 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
-import { Zap, Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
+import { Zap, Mail, Lock, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { authAPI } from '@/lib/api';
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -10,17 +11,38 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [needsVerification, setNeedsVerification] = useState(false);
+  const [resendStatus, setResendStatus] = useState(''); // '' | sending | sent | error
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
+    setNeedsVerification(false);
     setLoading(true);
     try {
       await login(email, password);
     } catch (err) {
-      setError(err.message || 'Login gagal');
+      const msg = err.message || 'Login gagal';
+      // Detect email verification required error
+      if (msg.toLowerCase().includes('belum diverifikasi') || msg.toLowerCase().includes('verification')) {
+        setNeedsVerification(true);
+        setError('');
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleResend() {
+    if (!email || resendStatus === 'sending') return;
+    setResendStatus('sending');
+    try {
+      await authAPI.resendVerification(email);
+      setResendStatus('sent');
+    } catch {
+      setResendStatus('error');
     }
   }
 
@@ -53,6 +75,39 @@ export default function LoginPage() {
           <p className="auth-form-subtitle">Enter your credentials to access your dashboard</p>
 
           {error && <div className="auth-error">{error}</div>}
+
+          {/* Email verification required banner */}
+          {needsVerification && (
+            <div style={{
+              padding: '16px', background: 'rgba(124,58,237,0.1)',
+              border: '1px solid rgba(124,58,237,0.3)', borderRadius: '10px',
+              marginBottom: '8px',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                <AlertCircle size={16} color="#a78bfa" />
+                <span style={{ color: '#a78bfa', fontWeight: 600, fontSize: 14 }}>Email belum diverifikasi</span>
+              </div>
+              <p style={{ color: '#94a3b8', fontSize: 13, margin: '0 0 12px', lineHeight: 1.6 }}>
+                Cek inbox Anda untuk link verifikasi, atau klik tombol di bawah untuk kirim ulang.
+              </p>
+              <button
+                onClick={handleResend}
+                disabled={resendStatus === 'sending' || resendStatus === 'sent'}
+                style={{
+                  width: '100%', padding: '9px',
+                  background: resendStatus === 'sent' ? 'rgba(16,185,129,0.2)' : 'rgba(124,58,237,0.3)',
+                  border: '1px solid rgba(124,58,237,0.4)',
+                  borderRadius: '8px', color: '#a78bfa',
+                  fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                {resendStatus === 'sending' ? 'Mengirim...' :
+                  resendStatus === 'sent' ? '✓ Email terkirim! Cek inbox Anda' :
+                  resendStatus === 'error' ? 'Gagal kirim, coba lagi' :
+                  '📧 Kirim Ulang Link Verifikasi'}
+              </button>
+            </div>
+          )}
 
           <form className="auth-form" onSubmit={handleSubmit}>
             <div className="input-group">

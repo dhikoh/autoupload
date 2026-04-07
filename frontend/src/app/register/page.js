@@ -1,7 +1,7 @@
 'use client';
 import { useState } from 'react';
 import Link from 'next/link';
-import { Zap, Mail, Lock, User, ArrowRight, Loader2 } from 'lucide-react';
+import { Zap, Mail, Lock, User, ArrowRight, Loader2, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 
 export default function RegisterPage() {
@@ -12,6 +12,7 @@ export default function RegisterPage() {
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [emailSent, setEmailSent] = useState(false); // email verification required state
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -21,19 +22,64 @@ export default function RegisterPage() {
       setError('Password tidak cocok');
       return;
     }
-    if (password.length < 6) {
-      setError('Password minimal 6 karakter');
+    if (password.length < 8) {
+      setError('Password minimal 8 karakter');
       return;
     }
 
     setLoading(true);
     try {
-      await register(email, name, password);
+      const result = await register(email, name, password);
+      // If server requires email verification, show check-email state
+      if (result && result.email_verification_required) {
+        setEmailSent(true);
+      }
+      // Otherwise AuthContext already handled redirect
     } catch (err) {
       setError(err.message || 'Registrasi gagal');
     } finally {
       setLoading(false);
     }
+  }
+
+  // Show check-email state
+  if (emailSent) {
+    return (
+      <div className="auth-page" style={{ justifyContent: 'center', alignItems: 'center' }}>
+        <div style={{
+          background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(124,58,237,0.2)',
+          borderRadius: '20px', padding: '48px 40px', maxWidth: '440px', width: '100%',
+          textAlign: 'center', backdropFilter: 'blur(20px)',
+        }}>
+          <div style={{
+            width: '72px', height: '72px', borderRadius: '50%',
+            background: 'rgba(124,58,237,0.15)', border: '2px solid rgba(124,58,237,0.4)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto 24px',
+          }}>
+            <Mail size={32} color="#a78bfa" />
+          </div>
+          <h2 style={{ color: '#e2e8f0', fontSize: '22px', fontWeight: 700, marginBottom: 12 }}>
+            Cek Email Anda!
+          </h2>
+          <p style={{ color: '#94a3b8', fontSize: '14px', lineHeight: 1.7, marginBottom: 24 }}>
+            Link verifikasi telah dikirim ke <strong style={{ color: '#a78bfa' }}>{email}</strong>.<br />
+            Klik link di email untuk mengaktifkan akun Anda.
+          </p>
+          <p style={{ color: '#64748b', fontSize: '13px', marginBottom: 24 }}>
+            Tidak menerima email? Cek folder Spam atau{' '}
+            <Link href="/verify-email" style={{ color: '#a78bfa' }}>minta kirim ulang</Link>.
+          </p>
+          <Link href="/login" style={{
+            display: 'block', background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+            color: '#fff', textDecoration: 'none', padding: '12px 32px',
+            borderRadius: '10px', fontWeight: 600, fontSize: '15px',
+          }}>
+            Kembali ke Login
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -98,7 +144,7 @@ export default function RegisterPage() {
               <label className="input-label">Password</label>
               <div className="input-icon-wrapper">
                 <Lock size={16} className="input-icon" />
-                <input type="password" className="input-field input-with-icon" placeholder="Min. 6 characters"
+                <input type="password" className="input-field input-with-icon" placeholder="Min. 8 characters"
                   value={password} onChange={e => setPassword(e.target.value)} required />
               </div>
             </div>

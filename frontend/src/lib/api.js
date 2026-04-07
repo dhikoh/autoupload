@@ -93,6 +93,15 @@ export const authAPI = {
       method: 'PUT',
       body: JSON.stringify({ current_password, new_password }),
     }),
+
+  verifyEmail: (token) =>
+    apiFetch(`/api/auth/verify-email?token=${encodeURIComponent(token)}`),
+
+  resendVerification: (email) =>
+    apiFetch('/api/auth/resend-verification', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
 };
 
 // ── Upload ────────────────────────────────────
@@ -235,6 +244,42 @@ export const adminAPI = {
   // Proof file URL — served via authenticated backend endpoint
   proofUrl: (filename) =>
     `${API_URL}/api/admin/proofs/${encodeURIComponent(filename)}`,
+};
+
+// ── Security (Admin) ──────────────────────────
+
+export const securityAPI = {
+  listBlockedIPs: (params = {}) => {
+    const query = new URLSearchParams();
+    if (params.skip) query.set('skip', params.skip);
+    if (params.limit) query.set('limit', params.limit);
+    const qs = query.toString();
+    return apiFetch(`/api/admin/security/blocked-ips${qs ? `?${qs}` : ''}`);
+  },
+
+  blockIP: (ip_address, reason, duration_hours) =>
+    apiFetch('/api/admin/security/blocked-ips', {
+      method: 'POST',
+      body: JSON.stringify({ ip_address, reason, duration_hours: duration_hours || null }),
+    }),
+
+  unblockIP: (id) =>
+    apiFetch(`/api/admin/security/blocked-ips/${id}`, { method: 'DELETE' }),
+
+  listEvents: (params = {}) => {
+    const query = new URLSearchParams();
+    if (params.event_type) query.set('event_type', params.event_type);
+    if (params.skip) query.set('skip', params.skip);
+    if (params.limit) query.set('limit', params.limit);
+    const qs = query.toString();
+    return apiFetch(`/api/admin/security/events${qs ? `?${qs}` : ''}`);
+  },
+
+  clearEvents: (days_old = 30) =>
+    apiFetch(`/api/admin/security/events?days_old=${days_old}`, { method: 'DELETE' }),
+
+  testEmail: () =>
+    apiFetch('/api/admin/security/test-email', { method: 'POST' }),
 };
 
 // ── Health ────────────────────────────────────
